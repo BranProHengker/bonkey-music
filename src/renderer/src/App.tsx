@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import {
   MagnifyingGlass,
   FolderOpen,
@@ -23,7 +23,18 @@ interface AlbumGroup {
 }
 
 export default function App(): React.JSX.Element {
-  const { playTrack, currentTrack, isPlaying } = useAudioEngine()
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const {
+    playTrack,
+    currentTrack,
+    isPlaying,
+    volume,
+    changeVolume,
+    nextTrack,
+    prevTrack,
+    toggleShuffle,
+    togglePlay
+  } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings'>('library')
@@ -37,6 +48,133 @@ export default function App(): React.JSX.Element {
   const [activePlaylist, setActivePlaylist] = useState<string | null>(null)
   const [activeAlbum, setActiveAlbum] = useState<string | null>(null)
   const [isScanning, setIsScanning] = useState(false)
+  const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'genre' | 'duration' | null>(null)
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
+
+  // ─── Navigation History ──────────────────────────────────────────────
+  const [history, setHistory] = useState<Array<{
+    currentView: 'library' | 'favorites' | 'settings'
+    activePlaylist: string | null
+    activeAlbum: string | null
+  }>>([{ currentView: 'library', activePlaylist: null, activeAlbum: null }])
+  const [historyIndex, setHistoryIndex] = useState(0)
+  const [isNavigatingHistory, setIsNavigatingHistory] = useState(false)
+
+  // Record history when view state changes
+  useEffect(() => {
+    if (isNavigatingHistory) {
+      setIsNavigatingHistory(false)
+      return
+    }
+
+    const lastState = history[historyIndex]
+    if (
+      lastState &&
+      lastState.currentView === currentView &&
+      lastState.activePlaylist === activePlaylist &&
+      lastState.activeAlbum === activeAlbum
+    ) {
+      return
+    }
+
+    const nextHistory = history.slice(0, historyIndex + 1)
+    nextHistory.push({ currentView, activePlaylist, activeAlbum })
+    setHistory(nextHistory)
+    setHistoryIndex(nextHistory.length - 1)
+  }, [currentView, activePlaylist, activeAlbum])
+
+  const goBack = () => {
+    if (historyIndex > 0) {
+      setIsNavigatingHistory(true)
+      const nextIndex = historyIndex - 1
+      setHistoryIndex(nextIndex)
+      const state = history[nextIndex]
+      setCurrentView(state.currentView)
+      setActivePlaylist(state.activePlaylist)
+      setActiveAlbum(state.activeAlbum)
+    }
+  }
+
+  const goForward = () => {
+    if (historyIndex < history.length - 1) {
+      setIsNavigatingHistory(true)
+      const nextIndex = historyIndex + 1
+      setHistoryIndex(nextIndex)
+      const state = history[nextIndex]
+      setCurrentView(state.currentView)
+      setActivePlaylist(state.activePlaylist)
+      setActiveAlbum(state.activeAlbum)
+    }
+  }
+
+  // ─── Global Keyboard & Mouse Event Listeners ──────────────────────────
+  useEffect(() => {
+    // 1. Mouse thumb buttons (Back/Forward)
+    const handleMouseUp = (e: MouseEvent) => {
+      if (e.button === 3) {
+        e.preventDefault()
+        goBack()
+      } else if (e.button === 4) {
+        e.preventDefault()
+        goForward()
+      }
+    }
+
+    // 2. Keyboard shortcuts (Ctrl+Arrow for Next/Prev, Ctrl+R for Shuffle, Space for Play/Pause)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput =
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.isContentEditable
+
+      if (e.key === ' ' || e.key === 'Spacebar') {
+        if (!isInput) {
+          e.preventDefault()
+          togglePlay()
+        }
+      }
+
+      if (e.ctrlKey) {
+        if (e.key === 'ArrowRight') {
+          e.preventDefault()
+          nextTrack()
+        } else if (e.key === 'ArrowLeft') {
+          e.preventDefault()
+          prevTrack()
+        } else if (e.key === 'r' || e.key === 'R') {
+          e.preventDefault()
+          toggleShuffle()
+        } else if (e.key === 'f' || e.key === 'F') {
+          e.preventDefault()
+          searchInputRef.current?.focus()
+          searchInputRef.current?.select()
+        }
+      }
+    }
+
+    // 3. Ctrl + Wheel Scroll for Volume Control
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey) {
+        e.preventDefault()
+        if (e.deltaY < 0) {
+          changeVolume(Math.min(1, volume + 0.05))
+        } else if (e.deltaY > 0) {
+          changeVolume(Math.max(0, volume - 0.05))
+        }
+      }
+    }
+
+    window.addEventListener('mouseup', handleMouseUp)
+    window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('wheel', handleWheel, { passive: false })
+
+    return () => {
+      window.removeEventListener('mouseup', handleMouseUp)
+      window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('wheel', handleWheel)
+    }
+  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay])
 
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
@@ -176,8 +314,27 @@ export default function App(): React.JSX.Element {
       )
     }
 
+    // 3. Sort tracks if sortField is active
+    if (sortField) {
+      result.sort((a, b) => {
+        const valA = a[sortField] || ''
+        const valB = b[sortField] || ''
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return sortOrder === 'asc'
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA)
+        }
+
+        // Numbers (duration)
+        return sortOrder === 'asc'
+          ? (valA as number) - (valB as number)
+          : (valB as number) - (valA as number)
+      })
+    }
+
     return result
-  }, [tracks, currentView, activePlaylist, activeAlbum, favorites, playlistTracks, searchQuery])
+  }, [tracks, currentView, activePlaylist, activeAlbum, favorites, playlistTracks, searchQuery, sortField, sortOrder])
 
   // ─── Handlers ───────────────────────────────────────────────────────
   const handlePlayTrack = (track: TrackMeta) => {
@@ -225,6 +382,7 @@ export default function App(): React.JSX.Element {
           <div className="search-input-wrapper">
             <MagnifyingGlass size={18} weight="light" />
             <input
+              ref={searchInputRef}
               type="text"
               className="search-input"
               placeholder="Search tracks, artists, albums..."
@@ -364,6 +522,20 @@ export default function App(): React.JSX.Element {
                   isPlaying={isPlaying}
                   favorites={favorites}
                   onToggleFavorite={handleToggleFavorite}
+                  sortField={sortField}
+                  sortOrder={sortOrder}
+                  onSort={(field) => {
+                    if (sortField === field) {
+                      if (sortOrder === 'asc') {
+                        setSortOrder('desc')
+                      } else {
+                        setSortField(null)
+                      }
+                    } else {
+                      setSortField(field)
+                      setSortOrder('asc')
+                    }
+                  }}
                 />
               </div>
             )}

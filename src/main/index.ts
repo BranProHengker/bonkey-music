@@ -3,7 +3,7 @@ import { join } from 'path'
 import { readFile, writeFile } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import icon from '../../resources/iconapp.png?asset'
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface TrackMeta {
@@ -16,6 +16,11 @@ export interface TrackMeta {
   year: number | null
   genre: string | null
   coverArt: string | null // base64 data URI
+  bitrate?: number
+  sampleRate?: number
+  bitsPerSample?: number
+  lossless?: boolean
+  container?: string
 }
 
 // ─── Custom Protocol ─────────────────────────────────────────────────
@@ -230,7 +235,12 @@ app.whenReady().then(async () => {
             trackNumber: common.track?.no || null,
             year: common.year || null,
             genre: common.genre?.[0] || null,
-            coverArt
+            coverArt,
+            bitrate: format.bitrate,
+            sampleRate: format.sampleRate,
+            bitsPerSample: format.bitsPerSample,
+            lossless: format.lossless,
+            container: format.container
           })
         } catch {
           // Skip files that can't be parsed

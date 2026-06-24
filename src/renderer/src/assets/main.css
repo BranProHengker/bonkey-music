@@ -628,7 +628,7 @@ button {
 
 .track-list-header {
   display: grid;
-  grid-template-columns: 48px 4fr 3fr 3fr 80px 48px;
+  grid-template-columns: 48px 4fr 3fr 3fr 2fr 80px 48px;
   padding: 8px 16px;
   font-size: 12px;
   font-weight: 500;
@@ -638,9 +638,22 @@ button {
   border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
+.track-list-header div[role="button"] {
+  cursor: pointer;
+  user-select: none;
+  transition: color var(--duration-fast) var(--ease-out-quint);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.track-list-header div[role="button"]:hover {
+  color: var(--text-secondary);
+}
+
 .track-row {
   display: grid;
-  grid-template-columns: 48px 4fr 3fr 3fr 80px 48px;
+  grid-template-columns: 48px 4fr 3fr 3fr 2fr 80px 48px;
   align-items: center;
   padding: 8px 16px;
   border-radius: var(--radius-card-inner);
@@ -730,6 +743,14 @@ button {
 }
 
 .track-album {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-artist-col {
   font-size: 13px;
   color: var(--text-secondary);
   white-space: nowrap;
@@ -879,6 +900,27 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.player-artist-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin-top: 2px;
+}
+
+.audio-quality-badge {
+  font-size: 9px;
+  font-family: var(--font-mono);
+  background: rgba(212, 168, 67, 0.08);
+  color: var(--accent);
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid rgba(212, 168, 67, 0.15);
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
 }
 
 /* Center: Playback Controls */

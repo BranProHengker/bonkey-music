@@ -19,6 +19,11 @@ interface TrackMeta {
   year: number | null
   genre: string | null
   coverArt: string | null
+  bitrate?: number
+  sampleRate?: number
+  bitsPerSample?: number
+  lossless?: boolean
+  container?: string
 }
 
 declare global {

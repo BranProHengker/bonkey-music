@@ -8,6 +8,9 @@ interface TrackListProps {
   isPlaying: boolean
   favorites: string[]
   onToggleFavorite: (filePath: string) => void
+  sortField?: 'title' | 'artist' | 'album' | 'genre' | 'duration' | null
+  sortOrder?: 'asc' | 'desc'
+  onSort?: (field: 'title' | 'artist' | 'album' | 'genre' | 'duration') => void
 }
 
 export default function TrackList({
@@ -16,13 +19,21 @@ export default function TrackList({
   currentTrack,
   isPlaying,
   favorites,
-  onToggleFavorite
+  onToggleFavorite,
+  sortField = null,
+  sortOrder = 'asc',
+  onSort
 }: TrackListProps) {
   const formatDuration = (secs: number) => {
     if (isNaN(secs) || secs <= 0) return '0:00'
     const m = Math.floor(secs / 60)
     const s = Math.floor(secs % 60)
     return `${m}:${s < 10 ? '0' : ''}${s}`
+  }
+
+  const renderSortIndicator = (field: 'title' | 'artist' | 'album' | 'genre' | 'duration') => {
+    if (sortField !== field) return null
+    return sortOrder === 'asc' ? ' ▲' : ' ▼'
   }
 
   if (tracks.length === 0) {
@@ -37,10 +48,21 @@ export default function TrackList({
     <div className="track-list-container">
       <div className="track-list-header">
         <div>#</div>
-        <div>Title</div>
-        <div>Album</div>
-        <div>Genre</div>
-        <div style={{ textAlign: 'right' }}>Time</div>
+        <div role="button" onClick={() => onSort?.('title')}>
+          Title{renderSortIndicator('title')}
+        </div>
+        <div role="button" onClick={() => onSort?.('artist')}>
+          Artist{renderSortIndicator('artist')}
+        </div>
+        <div role="button" onClick={() => onSort?.('album')}>
+          Album{renderSortIndicator('album')}
+        </div>
+        <div role="button" onClick={() => onSort?.('genre')}>
+          Genre{renderSortIndicator('genre')}
+        </div>
+        <div role="button" style={{ textAlign: 'right', justifyContent: 'flex-end' }} onClick={() => onSort?.('duration')}>
+          Time{renderSortIndicator('duration')}
+        </div>
         <div style={{ justifySelf: 'center' }}>Like</div>
       </div>
 
@@ -65,7 +87,7 @@ export default function TrackList({
                 <>
                   <span className="track-number-value">{track.trackNumber || index + 1}</span>
                   <button className="track-row-play-icon" onClick={() => onPlayTrack(track)}>
-                    <Play size={14} weight="fill" />
+                     <Play size={14} weight="fill" />
                   </button>
                 </>
               )}
@@ -79,11 +101,10 @@ export default function TrackList({
                   <MusicNotes size={16} weight="light" />
                 )}
               </div>
-              <div className="track-details">
-                <span className="track-title">{track.title}</span>
-                <span className="track-artist">{track.artist}</span>
-              </div>
+              <span className="track-title">{track.title}</span>
             </div>
+
+            <div className="track-artist-col">{track.artist}</div>
 
             <div className="track-album">{track.album}</div>
             

@@ -10,6 +10,11 @@ export interface TrackMeta {
   year: number | null
   genre: string | null
   coverArt: string | null // base64 data URI
+  bitrate?: number
+  sampleRate?: number
+  bitsPerSample?: number
+  lossless?: boolean
+  container?: string
 }
 
 export interface AudioContextType {
