@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-1.1.0-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-1.1.1-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/electron-v39-1a1a1f?style=flat-square&labelColor=0d0d0f" alt="Electron" />
 </p>

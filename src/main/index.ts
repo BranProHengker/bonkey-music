@@ -274,11 +274,20 @@ app.whenReady().then(async () => {
     try {
       // Decode the URL directly after stripping the protocol prefix
       // This prevents ERR_INVALID_URL when parsing Windows paths like media://C:\Users\...
-      let filePath = request.url.slice('media://'.length)
+      let filePath = request.url
+      if (filePath.startsWith('media:///')) {
+        filePath = filePath.slice('media:///'.length)
+      } else if (filePath.startsWith('media://')) {
+        filePath = filePath.slice('media://'.length)
+      }
       filePath = decodeURIComponent(filePath)
 
-      // On Windows, the path might start with an extra slash if it was parsed strangely,
-      // but with simple slice, it usually starts with C:. If it's a Unix path, we need the leading slash.
+      // Remove leading slash on Windows (e.g., /c:/Users/... -> c:/Users/...)
+      if (filePath.startsWith('/') && /^\/[a-zA-Z]:/.test(filePath)) {
+        filePath = filePath.slice(1)
+      }
+
+      // On Unix, ensure the path has a leading slash
       if (!filePath.startsWith('/') && !/^[a-zA-Z]:/.test(filePath)) {
         filePath = '/' + filePath
       }
