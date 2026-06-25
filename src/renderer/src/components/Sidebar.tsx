@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { House, Heart, Gear, Plus, Playlist, Disc, MusicNotes } from '@phosphor-icons/react'
+import { House, Heart, Gear, Plus, Disc, MusicNotes } from '@phosphor-icons/react'
+import iconApp from '../assets/iconapp.png'
 
 interface SidebarProps {
   currentView: 'library' | 'favorites' | 'settings'
@@ -82,8 +83,8 @@ export default function Sidebar({
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <Playlist size={26} weight="light" color="var(--accent)" />
-        <span>VibeVault</span>
+        <img src={iconApp} alt="App Icon" style={{ width: '26px', height: '26px', objectFit: 'contain' }} />
+        <span>Bonkey Music</span>
       </div>
 
       <nav className="sidebar-nav">

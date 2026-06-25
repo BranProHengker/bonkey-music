@@ -8,6 +8,7 @@ import {
   Folder,
   Info
 } from '@phosphor-icons/react'
+import iconApp from './assets/iconapp.png'
 
 import Sidebar from './components/Sidebar'
 import TrackList from './components/TrackList'
@@ -160,6 +161,12 @@ export default function App(): React.JSX.Element {
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault()
           prevTrack()
+        } else if (e.key === 'ArrowUp') {
+          e.preventDefault()
+          changeVolume(Math.min(1, volume + 0.05))
+        } else if (e.key === 'ArrowDown') {
+          e.preventDefault()
+          changeVolume(Math.max(0, volume - 0.05))
         } else if (e.key === 'r' || e.key === 'R') {
           e.preventDefault()
           toggleShuffle()
@@ -394,8 +401,9 @@ export default function App(): React.JSX.Element {
   return (
     <div className="app-container">
       {/* Draggable header bar */}
-      <header className="app-header">
-        <div className="app-title">Vault Audio Player</div>
+      <header className="app-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <img src={iconApp} alt="App Icon" style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+        <div className="app-title">Bonkey Music</div>
       </header>
 
       {/* Left Sidebar */}
@@ -531,7 +539,7 @@ export default function App(): React.JSX.Element {
                 </div>
                 <div className="keybind-row">
                   <span className="keybind-action">Volume Control</span>
-                  <kbd className="keybind-key">Ctrl + Scroll Wheel</kbd>
+                  <kbd className="keybind-key">Ctrl + Scroll Wheel / Ctrl + Up/Down</kbd>
                 </div>
                 <div className="keybind-row">
                   <span className="keybind-action">Page Navigation Back</span>

@@ -48,7 +48,7 @@ export default function PlaylistGrid({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <h2 className="section-title">Explore Your Vault</h2>
+      <h2 className="section-title">Explore Bonkey Music</h2>
       
       <div className="bento-grid">
         {/* Card 1: Favorites (Large Bento: 2 cols) */}
@@ -114,7 +114,7 @@ export default function PlaylistGrid({
           <div className="card-inner" style={{ padding: '24px', justifyContent: 'space-between' }}>
             <div>
               <span className="card-tag">Library Stats</span>
-              <h3 className="card-title" style={{ marginTop: '8px', fontSize: '20px' }}>Your Vault</h3>
+              <h3 className="card-title" style={{ marginTop: '8px', fontSize: '20px' }}>Bonkey Library</h3>
             </div>
             
             <div className="stats-metrik-list">
@@ -181,7 +181,7 @@ export default function PlaylistGrid({
           <div className="card-inner" style={{ padding: '24px', justifyContent: 'space-between' }}>
             <div className="welcome-header">
               <span className="card-tag">System Console</span>
-              <h3 className="welcome-title">VibeVault Engine</h3>
+              <h3 className="welcome-title">Bonkey Engine</h3>
               <p className="welcome-desc">
                 {libraryFolder ? (
                   <>
