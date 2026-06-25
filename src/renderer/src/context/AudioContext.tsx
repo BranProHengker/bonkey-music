@@ -73,6 +73,20 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     handleSongEndedRef.current = handleSongEnded
   })
 
+  // Helper to persist audio settings to settings.json
+  const persistAudioSettings = async (updates: Record<string, unknown>) => {
+    try {
+      const settings = await window.api.loadSettings()
+      const updatedSettings = {
+        ...settings,
+        ...updates
+      }
+      await window.api.saveSettings(updatedSettings)
+    } catch (err) {
+      console.error('Failed to save settings:', err)
+    }
+  }
+
   // Initialize Audio
   useEffect(() => {
     const audio = new Audio()
@@ -91,15 +105,54 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     audio.addEventListener('durationchange', onDurationChange)
     audio.addEventListener('ended', onEnded)
 
-    // Load saved volume/mute settings from electron settings file
-    window.api.loadSettings().then((settings) => {
-      if (settings && typeof settings.volume === 'number') {
-        audio.volume = settings.volume
-        setVolume(settings.volume)
-      }
-      if (settings && typeof settings.isMuted === 'boolean') {
-        audio.muted = settings.isMuted
-        setIsMuted(settings.isMuted)
+    // Load saved volume/mute and last played settings from electron settings file
+    window.api.loadSettings().then(async (settings) => {
+      if (settings) {
+        if (typeof settings.volume === 'number') {
+          audio.volume = settings.volume
+          setVolume(settings.volume)
+        }
+        if (typeof settings.isMuted === 'boolean') {
+          audio.muted = settings.isMuted
+          setIsMuted(settings.isMuted)
+        }
+
+        const lastTrackPath = settings.lastPlayedTrack as string | undefined
+        const lastTime = settings.lastPlayedTime as number | undefined
+
+        if (lastTrackPath) {
+          try {
+            const lib = (await window.api.loadLibrary()) as TrackMeta[]
+            if (lib && lib.length > 0) {
+              const track = lib.find((t) => t.filePath === lastTrackPath)
+              if (track) {
+                setCurrentTrack(track)
+                audio.src = getAudioUrl(track.filePath)
+                
+                const onMetadataLoaded = () => {
+                  if (typeof lastTime === 'number') {
+                    audio.currentTime = lastTime
+                    setCurrentTime(lastTime)
+                  }
+                  audio.removeEventListener('loadedmetadata', onMetadataLoaded)
+                }
+                audio.addEventListener('loadedmetadata', onMetadataLoaded)
+                audio.load()
+
+                // Restore originalQueue and queue
+                setOriginalQueue(lib)
+                const index = lib.findIndex((t) => t.filePath === track.filePath)
+                if (index !== -1) {
+                  setQueue(lib.slice(index))
+                } else {
+                  setQueue([track])
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Failed to restore last played track on startup:', err)
+          }
+        }
       }
     })
 
@@ -135,6 +188,24 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isPlaying])
 
+  // Periodically save play position
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null
+
+    if (isPlaying && currentTrack) {
+      intervalId = setInterval(() => {
+        if (audioRef.current) {
+          const time = audioRef.current.currentTime
+          persistAudioSettings({ lastPlayedTime: time })
+        }
+      }, 5000)
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+    }
+  }, [isPlaying, currentTrack])
+
   // Play a track and optionally update the queue context
   const playTrack = (track: TrackMeta, tracksContext?: TrackMeta[]) => {
     if (!audioRef.current) return
@@ -147,6 +218,12 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     audioRef.current.play()
       .then(() => setIsPlaying(true))
       .catch((err) => console.error('Audio play failed:', err))
+
+    // Persist last played track and reset position
+    persistAudioSettings({
+      lastPlayedTrack: track.filePath,
+      lastPlayedTime: 0
+    })
 
     // Set the queue context if provided
     if (tracksContext && tracksContext.length > 0) {
@@ -175,6 +252,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     if (!audioRef.current || !currentTrack) return
     if (isPlaying) {
       audioRef.current.pause()
+      persistAudioSettings({ lastPlayedTime: audioRef.current.currentTime })
     } else {
       audioRef.current.play().catch((err) => console.error('Audio play failed:', err))
     }
@@ -208,6 +286,11 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     audioRef.current.play()
       .then(() => setIsPlaying(true))
       .catch((err) => console.error('Audio play failed:', err))
+
+    persistAudioSettings({
+      lastPlayedTrack: track.filePath,
+      lastPlayedTime: 0
+    })
   }
 
   // Handle previous track
@@ -218,6 +301,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     if (audioRef.current.currentTime > 3) {
       audioRef.current.currentTime = 0
       setCurrentTime(0)
+      persistAudioSettings({ lastPlayedTime: 0 })
       return
     }
 
@@ -232,6 +316,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       // Just restart current track
       audioRef.current.currentTime = 0
       setCurrentTime(0)
+      persistAudioSettings({ lastPlayedTime: 0 })
     }
   }
 
@@ -253,6 +338,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     if (!audioRef.current) return
     audioRef.current.currentTime = time
     setCurrentTime(time)
+    persistAudioSettings({ lastPlayedTime: time })
   }
 
   // Change volume (0 to 1)
@@ -262,6 +348,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       audioRef.current.volume = safeVol
     }
     setVolume(safeVol)
+    persistAudioSettings({ volume: safeVol })
   }
 
   // Toggle mute
@@ -270,6 +357,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     const newMuted = !isMuted
     audioRef.current.muted = newMuted
     setIsMuted(newMuted)
+    persistAudioSettings({ isMuted: newMuted })
   }
 
   // Toggle Shuffle

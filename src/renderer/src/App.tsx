@@ -407,6 +407,16 @@ export default function App(): React.JSX.Element {
           }
         }}
         onCreatePlaylist={handleCreatePlaylist}
+        albums={albums}
+        activeAlbum={activeAlbum}
+        setActiveAlbum={(albumName) => {
+          setActiveAlbum(albumName)
+          setActivePlaylist(null)
+          if (albumName !== null) {
+            setCurrentView('library')
+          }
+        }}
+        playlistTracks={playlistTracks}
       />
 
       {/* Main Panel */}
