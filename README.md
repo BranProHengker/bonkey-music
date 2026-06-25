@@ -243,5 +243,5 @@ This project is open-source and available under the [MIT License](LICENSE).
 ---
 
 <p align="center">
-  Made with 🔥 by <strong>Bonkey Music Team</strong>
+  Made with 🔥 by <strong><a href="https://gutsi.my.id">gutsi.my.id</a></strong>
 </p>
