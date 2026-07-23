@@ -889,7 +889,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll()
   if (rpcClient) {
     try {
-      rpcClient.destroy()
+      rpcClient.destroy().catch(() => {})
     } catch {}
   }
 })
