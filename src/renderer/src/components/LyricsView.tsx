@@ -15,7 +15,7 @@ interface LyricsViewProps {
   onClose: () => void
 }
 
-interface LyricLineItemProps {
+interface LyricLineItemProps { 
   text: string
   time: number
   isActive: boolean
@@ -205,21 +205,6 @@ export default function LyricsView({
     }
   }
 
-  // Handle copying all lyrics to clipboard
-  const handleCopyLyrics = async () => {
-    if (lyricsList.length === 0) return
-    const textToCopy = lyricsList
-      .map((l) => (l.isSpacer ? '' : l.text))
-      .join('\n')
-    try {
-      await navigator.clipboard.writeText(textToCopy)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    } catch {
-      // ignore
-    }
-  }
-
   const coverArtSrc = currentTrack?.coverArt || ''
 
   return (
@@ -270,63 +255,6 @@ export default function LyricsView({
             </div>
           ) : (
             <>
-              {/* Header toolbar for lyrics type and actions */}
-              <div className="lyrics-header-toolbar">
-                <div className="lyrics-type-tag">
-                  {hasTimestamps ? (
-                    <span className="lyrics-badge synced">
-                      <MicrophoneStage size={14} weight="bold" />
-                      Synced Lyrics
-                    </span>
-                  ) : (
-                    <span className="lyrics-badge plain">
-                      <TextAlignLeft size={14} weight="bold" />
-                      Plain Lyrics
-                    </span>
-                  )}
-                </div>
-
-                <div className="lyrics-toolbar-actions">
-                  {/* If lyrics have timestamps, allow toggling between Synced & Full Text mode */}
-                  {hasTimestamps && (
-                    <button
-                      className="lyrics-action-btn"
-                      onClick={() => setViewMode((prev) => (prev === 'synced' ? 'plain' : 'synced'))}
-                      title={viewMode === 'synced' ? 'Switch to Full Text view' : 'Switch to Synced view'}
-                    >
-                      {viewMode === 'synced' ? (
-                        <>
-                          <TextAlignLeft size={14} weight="bold" />
-                          <span>Full Text</span>
-                        </>
-                      ) : (
-                        <>
-                          <MicrophoneStage size={14} weight="bold" />
-                          <span>Synced Mode</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  <button
-                    className="lyrics-action-btn"
-                    onClick={handleCopyLyrics}
-                    title="Copy lyrics to clipboard"
-                  >
-                    {copied ? (
-                      <>
-                        <Check size={14} weight="bold" color="#4ade80" />
-                        <span style={{ color: '#4ade80' }}>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={14} weight="bold" />
-                        <span>Copy</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
 
               {/* Mode 1: Synced karaoke style lyrics */}
               {isSyncedActive ? (
