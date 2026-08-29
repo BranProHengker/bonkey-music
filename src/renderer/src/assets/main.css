@@ -2007,13 +2007,108 @@ button {
   -webkit-mask-image: linear-gradient(to bottom, transparent 0%, white 15%, white 85%, transparent 100%);
 }
 
-/* Hide scrollbar but keep scroll functionality */
+.lyrics-right-list.plain-mode {
+  mask-image: linear-gradient(to bottom, transparent 0%, white 3%, white 97%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, white 3%, white 97%, transparent 100%);
+}
+
+/* Hide scrollbar by default in synced mode */
 .lyrics-right-list::-webkit-scrollbar {
   display: none;
 }
 
+/* Enable subtle scrollbar in plain full-text mode */
+.lyrics-right-list.plain-mode::-webkit-scrollbar {
+  display: block;
+  width: 6px;
+}
+
+.lyrics-right-list.plain-mode::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.lyrics-right-list.plain-mode::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+
+.lyrics-right-list.plain-mode::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+}
+
+/* ─── Lyrics Header Toolbar ─────────────────────────────────────────── */
+.lyrics-header-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  margin-bottom: 20px;
+  border-radius: var(--radius-card);
+  background: rgba(20, 20, 24, 0.65);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+}
+
+.lyrics-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+}
+
+.lyrics-badge.synced {
+  background: rgba(255, 78, 46, 0.15);
+  color: #ff6b4a;
+  border: 1px solid rgba(255, 78, 46, 0.3);
+}
+
+.lyrics-badge.plain {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.lyrics-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lyrics-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out-quint);
+}
+
+.lyrics-action-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+  border-color: rgba(255, 255, 255, 0.25);
+  transform: translateY(-1px);
+}
+
+/* ─── Synced Mode Scroller ─────────────────────────────────────────── */
 .lyrics-scroller {
-  padding: 320px 0; /* Expanded padding to allow easy centering */
+  padding: 300px 0; /* Expanded padding to allow easy centering */
   width: 100%;
   display: flex;
   flex-direction: column;
@@ -2063,6 +2158,37 @@ button {
   font-weight: 600;
   color: var(--text-secondary);
   opacity: 0.6;
+}
+
+/* ─── Plain Mode Scroller (Direct Reading, Full Text) ───────────────── */
+.lyrics-plain-scroller {
+  padding: 12px 8px 60px 4px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  user-select: text;
+}
+
+.lyrics-plain-line {
+  font-family: 'Outfit', 'Plus Jakarta Sans', var(--font-sans);
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.65;
+  color: #ffffff;
+  opacity: 0.95;
+  letter-spacing: -0.4px;
+  margin-bottom: 6px;
+  cursor: text;
+  transition: color var(--duration-fast) ease;
+}
+
+.lyrics-plain-line:hover {
+  color: #ff9478;
+}
+
+.lyrics-plain-spacer {
+  height: 28px;
+  width: 100%;
 }
 
 .lyrics-empty-state {

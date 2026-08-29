@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, useMemo, memo, forwardRef } from 'react'
-import { MusicNotes, X } from '@phosphor-icons/react'
+import { MusicNotes, X, Copy, Check, TextAlignLeft, MicrophoneStage } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface LyricLine {
-  time: number // in seconds
+  time: number // in seconds (-1 for plain unsynced lines)
   text: string
+  isSpacer?: boolean
 }
 
 interface LyricsViewProps {
@@ -46,8 +47,10 @@ export default function LyricsView({
   onClose
 }: LyricsViewProps): React.JSX.Element {
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
-  const [lyricsList, setLyricsList] = useState<LyricLine[]>([])
+  const [viewMode, setViewMode] = useState<'synced' | 'plain'>('synced')
+  const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const plainContainerRef = useRef<HTMLDivElement>(null)
   const activeLineRef = useRef<HTMLDivElement>(null)
 
   // Fetch lyrics when track changes
@@ -55,7 +58,6 @@ export default function LyricsView({
     async function fetchLyrics() {
       if (!currentTrack) {
         setRawLyrics(null)
-        setLyricsList([])
         return
       }
       try {
@@ -69,63 +71,110 @@ export default function LyricsView({
     fetchLyrics()
   }, [currentTrack])
 
-  // Parse raw LRC lyrics
-  useEffect(() => {
-    if (!rawLyrics) {
-      setLyricsList([])
-      return
+  // Parse raw LRC / TXT lyrics
+  const { lines: lyricsList, hasTimestamps } = useMemo(() => {
+    if (!rawLyrics || !rawLyrics.trim()) {
+      return { lines: [], hasTimestamps: false }
     }
 
-    const lines = rawLyrics.split(/\r?\n/)
-    const parsed: LyricLine[] = []
+    const rawLines = rawLyrics.split(/\r?\n/)
+    const timedLines: LyricLine[] = []
+    const plainLines: LyricLine[] = []
+    let foundAnyTimestamp = false
 
-    lines.forEach((line) => {
-      // Matches standard [mm:ss.xx] or [mm:ss:xx] or [mm:ss]
-      const match = line.match(/\[(\d{2}):(\d{2})(?:\.(\d{2,3}))?\](.*)/)
-      if (match) {
-        const minutes = parseInt(match[1], 10)
-        const seconds = parseInt(match[2], 10)
-        const msStr = match[3] || ''
-        const ms = msStr ? parseInt(msStr, 10) : 0
-        
-        // Convert time to total seconds
-        const time = minutes * 60 + seconds + (msStr ? ms / (msStr.length === 3 ? 1000 : 100) : 0)
-        const text = match[4].trim()
-        
-        // Add only non-empty lines or timestamps intended as instrumental break separators
-        parsed.push({ time, text: text || '♩' })
+    for (const rawLine of rawLines) {
+      const line = rawLine.trimEnd()
+
+      // Match timestamps like [00:12.34], [0:12.34], [00:12:34], [00:12], [00:12.345]
+      const timestampRegex = /\[(\d{1,2}):(\d{2})(?:[.:](\d{2,3}))?\]/g
+      const matches = Array.from(line.matchAll(timestampRegex))
+
+      if (matches.length > 0) {
+        foundAnyTimestamp = true
+        const textOnly = line.replace(timestampRegex, '').trim()
+        const displayText = textOnly || '♩'
+
+        for (const match of matches) {
+          const minutes = parseInt(match[1], 10)
+          const seconds = parseInt(match[2], 10)
+          const msStr = match[3] || ''
+          const ms = msStr ? parseInt(msStr, 10) : 0
+          const time = minutes * 60 + seconds + (msStr ? ms / (msStr.length === 3 ? 1000 : 100) : 0)
+
+          timedLines.push({
+            time,
+            text: displayText
+          })
+        }
       } else {
-        // Fallback for plain text lyrics without timestamps (render them but time = 0)
         const trimmed = line.trim()
-        if (trimmed && !trimmed.startsWith('[')) {
-          parsed.push({ time: -1, text: trimmed })
+        // Skip metadata tags like [ti:Title], [ar:Artist], [al:Album], [by:...], [offset:...], [length:...]
+        if (/^\[[a-zA-Z]{2,6}:.*\]$/.test(trimmed)) {
+          continue
+        }
+
+        if (trimmed === '') {
+          plainLines.push({
+            time: -1,
+            text: '',
+            isSpacer: true
+          })
+        } else {
+          plainLines.push({
+            time: -1,
+            text: trimmed
+          })
         }
       }
-    })
+    }
 
-    // Sort parsed lyrics by timestamp
-    setLyricsList(parsed.sort((a, b) => a.time - b.time))
+    if (foundAnyTimestamp && timedLines.length > 0) {
+      // Sort parsed timed lyrics chronologically
+      timedLines.sort((a, b) => a.time - b.time)
+      return { lines: timedLines, hasTimestamps: true }
+    } else {
+      // Clean up leading and trailing spacers for plain text
+      let start = 0
+      while (start < plainLines.length && plainLines[start].isSpacer) {
+        start++
+      }
+      let end = plainLines.length - 1
+      while (end >= 0 && plainLines[end].isSpacer) {
+        end--
+      }
+      const cleaned = start <= end ? plainLines.slice(start, end + 1) : []
+      return { lines: cleaned, hasTimestamps: false }
+    }
   }, [rawLyrics])
 
-  // Determine current active lyric line
-  const activeIndex = useMemo(() => {
-    if (lyricsList.length === 0) return -1
-    const firstTimedLine = lyricsList.find((l) => l.time >= 0)
-    if (!firstTimedLine) return -1
-    
-    if (currentTime < firstTimedLine.time) return -1
+  // Reset scroll when plain mode or track changes
+  useEffect(() => {
+    if (plainContainerRef.current) {
+      plainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  }, [currentTrack, hasTimestamps, viewMode])
 
-    // Find the latest lyric line whose time is less than or equal to current playing time
+  // Is active view mode synced?
+  const isSyncedActive = hasTimestamps && viewMode === 'synced'
+
+  // Determine current active lyric line for synced lyrics
+  const activeIndex = useMemo(() => {
+    if (!isSyncedActive || lyricsList.length === 0) return -1
+    const firstTimedLine = lyricsList.find((l) => l.time >= 0)
+    if (!firstTimedLine || currentTime < firstTimedLine.time) return -1
+
     for (let i = lyricsList.length - 1; i >= 0; i--) {
       if (lyricsList[i].time >= 0 && currentTime >= lyricsList[i].time) {
         return i
       }
     }
     return -1
-  }, [lyricsList, currentTime])
+  }, [isSyncedActive, lyricsList, currentTime])
 
-  // Smooth scroll active lyric line into center of container or reset to top if activeIndex is -1
+  // Smooth scroll active lyric line into center of container
   useEffect(() => {
+    if (!isSyncedActive) return
+
     if (activeIndex === -1) {
       if (containerRef.current) {
         containerRef.current.scrollTo({
@@ -136,20 +185,19 @@ export default function LyricsView({
     } else if (activeLineRef.current && containerRef.current) {
       const activeLine = activeLineRef.current
       const container = containerRef.current
-      
+
       const activeTop = activeLine.offsetTop
       const activeHeight = activeLine.offsetHeight
       const containerHeight = container.offsetHeight
-      
-      // Calculate target scroll position to center the active line
-      const targetScrollTop = activeTop - (containerHeight / 2) + (activeHeight / 2)
-      
+
+      const targetScrollTop = activeTop - containerHeight / 2 + activeHeight / 2
+
       container.scrollTo({
         top: Math.max(0, targetScrollTop),
         behavior: 'smooth'
       })
     }
-  }, [activeIndex])
+  }, [isSyncedActive, activeIndex])
 
   const handleLineClick = (time: number) => {
     if (time >= 0) {
@@ -157,13 +205,27 @@ export default function LyricsView({
     }
   }
 
-  // Fallback covers
+  // Handle copying all lyrics to clipboard
+  const handleCopyLyrics = async () => {
+    if (lyricsList.length === 0) return
+    const textToCopy = lyricsList
+      .map((l) => (l.isSpacer ? '' : l.text))
+      .join('\n')
+    try {
+      await navigator.clipboard.writeText(textToCopy)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // ignore
+    }
+  }
+
   const coverArtSrc = currentTrack?.coverArt || ''
 
   return (
     <div className="lyrics-view-overlay">
       {/* Blurred background cover art */}
-      <div 
+      <div
         className="lyrics-bg-blur"
         style={{ backgroundImage: coverArtSrc ? `url(${coverArtSrc})` : 'none' }}
       />
@@ -193,8 +255,11 @@ export default function LyricsView({
           </div>
         </div>
 
-        {/* Right column: Synced Lyrics list */}
-        <div className="lyrics-right-list" ref={containerRef}>
+        {/* Right column: Lyrics view */}
+        <div
+          className={`lyrics-right-list ${!isSyncedActive ? 'plain-mode' : ''}`}
+          ref={isSyncedActive ? containerRef : plainContainerRef}
+        >
           {lyricsList.length === 0 ? (
             <div className="lyrics-empty-state">
               <MusicNotes size={32} weight="light" style={{ marginBottom: '12px', opacity: 0.4 }} />
@@ -204,24 +269,101 @@ export default function LyricsView({
               </span>
             </div>
           ) : (
-            <div className="lyrics-scroller">
-              {lyricsList.map((line, idx) => {
-                const isActive = idx === activeIndex
-                const isPast = idx < activeIndex
-                
-                return (
-                  <MemoizedLyricLineItem
-                    key={idx}
-                    ref={isActive ? activeLineRef : null}
-                    text={line.text}
-                    time={line.time}
-                    isActive={isActive}
-                    isPast={isPast}
-                    onClick={() => handleLineClick(line.time)}
-                  />
-                )
-              })}
-            </div>
+            <>
+              {/* Header toolbar for lyrics type and actions */}
+              <div className="lyrics-header-toolbar">
+                <div className="lyrics-type-tag">
+                  {hasTimestamps ? (
+                    <span className="lyrics-badge synced">
+                      <MicrophoneStage size={14} weight="bold" />
+                      Synced Lyrics
+                    </span>
+                  ) : (
+                    <span className="lyrics-badge plain">
+                      <TextAlignLeft size={14} weight="bold" />
+                      Plain Lyrics
+                    </span>
+                  )}
+                </div>
+
+                <div className="lyrics-toolbar-actions">
+                  {/* If lyrics have timestamps, allow toggling between Synced & Full Text mode */}
+                  {hasTimestamps && (
+                    <button
+                      className="lyrics-action-btn"
+                      onClick={() => setViewMode((prev) => (prev === 'synced' ? 'plain' : 'synced'))}
+                      title={viewMode === 'synced' ? 'Switch to Full Text view' : 'Switch to Synced view'}
+                    >
+                      {viewMode === 'synced' ? (
+                        <>
+                          <TextAlignLeft size={14} weight="bold" />
+                          <span>Full Text</span>
+                        </>
+                      ) : (
+                        <>
+                          <MicrophoneStage size={14} weight="bold" />
+                          <span>Synced Mode</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  <button
+                    className="lyrics-action-btn"
+                    onClick={handleCopyLyrics}
+                    title="Copy lyrics to clipboard"
+                  >
+                    {copied ? (
+                      <>
+                        <Check size={14} weight="bold" color="#4ade80" />
+                        <span style={{ color: '#4ade80' }}>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={14} weight="bold" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              {/* Mode 1: Synced karaoke style lyrics */}
+              {isSyncedActive ? (
+                <div className="lyrics-scroller">
+                  {lyricsList.map((line, idx) => {
+                    const isActive = idx === activeIndex
+                    const isPast = idx < activeIndex
+
+                    return (
+                      <MemoizedLyricLineItem
+                        key={idx}
+                        ref={isActive ? activeLineRef : null}
+                        text={line.text}
+                        time={line.time}
+                        isActive={isActive}
+                        isPast={isPast}
+                        onClick={() => handleLineClick(line.time)}
+                      />
+                    )
+                  })}
+                </div>
+              ) : (
+                /* Mode 2: Plain full text lyrics (directly readable, whole text from top to bottom) */
+                <div className="lyrics-plain-scroller">
+                  {lyricsList.map((line, idx) => {
+                    if (line.isSpacer) {
+                      return <div key={`spacer-${idx}`} className="lyrics-plain-spacer" />
+                    }
+                    return (
+                      <div key={idx} className="lyrics-plain-line">
+                        {line.text}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

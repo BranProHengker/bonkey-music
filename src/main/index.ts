@@ -563,17 +563,33 @@ app.whenReady().then(async () => {
   ipcMain.handle('get-lyrics', async (_event, audioFilePath: string) => {
     console.log('[Main IPC] get-lyrics requested for:', audioFilePath)
     try {
-      // Replace audio extension with .lrc or .txt
+      // Replace audio extension with .lrc or .txt (check multiple extension casings)
       const baseName = audioFilePath.replace(/\.[^.]+$/, '')
-      const lrcPath = baseName + '.lrc'
-      const txtPath = baseName + '.txt'
-      console.log('[Main IPC] Checking lrcPath:', lrcPath, 'exists:', existsSync(lrcPath))
+      const possibleExtensions = ['.lrc', '.txt', '.LRC', '.TXT', '.lyrics']
 
-      if (existsSync(lrcPath)) {
-        return await readFile(lrcPath, 'utf-8')
-      } else if (existsSync(txtPath)) {
-        return await readFile(txtPath, 'utf-8')
+      for (const ext of possibleExtensions) {
+        const lyricPath = baseName + ext
+        if (existsSync(lyricPath)) {
+          return await readFile(lyricPath, 'utf-8')
+        }
       }
+
+      // Fallback: Check for embedded lyrics in audio metadata
+      try {
+        const { parseFile } = await import('music-metadata')
+        const metadata = await parseFile(audioFilePath)
+        if (metadata.common.lyrics && metadata.common.lyrics.length > 0) {
+          const lyricItem = metadata.common.lyrics[0]
+          if (typeof lyricItem === 'string') {
+            return lyricItem
+          } else if (lyricItem && typeof lyricItem === 'object' && 'text' in lyricItem) {
+            return (lyricItem as { text: string }).text
+          }
+        }
+      } catch {
+        // Fallback failed silently, return null
+      }
+
       return null
     } catch (err) {
       console.warn('Failed to load lyrics file:', err)
