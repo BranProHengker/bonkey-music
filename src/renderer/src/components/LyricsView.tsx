@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, memo, forwardRef } from 'react'
-import { MusicNotes, X, Copy, Check, TextAlignLeft, MicrophoneStage } from '@phosphor-icons/react'
+import { MusicNotes, X } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface LyricLine {
@@ -47,8 +47,6 @@ export default function LyricsView({
   onClose
 }: LyricsViewProps): React.JSX.Element {
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'synced' | 'plain'>('synced')
-  const [copied, setCopied] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const plainContainerRef = useRef<HTMLDivElement>(null)
   const activeLineRef = useRef<HTMLDivElement>(null)
@@ -152,10 +150,10 @@ export default function LyricsView({
     if (plainContainerRef.current) {
       plainContainerRef.current.scrollTo({ top: 0, behavior: 'smooth' })
     }
-  }, [currentTrack, hasTimestamps, viewMode])
+  }, [currentTrack, hasTimestamps])
 
   // Is active view mode synced?
-  const isSyncedActive = hasTimestamps && viewMode === 'synced'
+  const isSyncedActive = hasTimestamps
 
   // Determine current active lyric line for synced lyrics
   const activeIndex = useMemo(() => {
