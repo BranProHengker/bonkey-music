@@ -41,4 +41,4 @@ publish:
   provider: github
   owner: BranProHengker
   repo: bonkey-music
-  releaseType: draft
+  releaseType: release
