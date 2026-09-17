@@ -839,13 +839,16 @@ app.whenReady().then(async () => {
         return
       }
 
+      const safeDetails = songData.title.length < 2 ? `${songData.title} ` : songData.title.slice(0, 128)
+      const safeArtist = songData.artist ? (songData.artist.length < 2 ? `${songData.artist} ` : songData.artist) : 'Unknown'
+
       if (songData.isPlaying) {
         // Playing: show track with elapsed timestamp
         const startTimestamp = Date.now() - (songData.currentTime * 1000)
 
         const activityPayload = {
-          details: songData.title,
-          state: `by ${songData.artist}`,
+          details: safeDetails,
+          state: `by ${safeArtist}`,
           startTimestamp: Math.floor(startTimestamp / 1000),
           largeImageKey: 'logo_app',
           largeImageText: 'Bonkey Music',
@@ -865,8 +868,8 @@ app.whenReady().then(async () => {
       } else {
         // Paused: show track info with "Paused" state, no timestamp
         const activityPayload = {
-          details: songData.title,
-          state: `by ${songData.artist} • Paused`,
+          details: safeDetails,
+          state: `by ${safeArtist} • Paused`,
           largeImageKey: 'logo_app',
           largeImageText: 'Bonkey Music',
           smallImageKey: 'pause_icon',
