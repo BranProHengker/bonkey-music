@@ -884,12 +884,12 @@ export default function App(): React.JSX.Element {
 
               <div className="settings-row" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '16px' }}>
                 <div className="settings-label">
-                  <span className="settings-title" style={{ color: '#FF4E2E' }}>Reset Music Library</span>
+                  <span className="settings-title" style={{ color: 'var(--color-favorite)' }}>Reset Music Library</span>
                   <span className="settings-subtitle">Remove all indexed songs from your library cache. This will not delete your files.</span>
                 </div>
                 <button 
                   className="btn-secondary" 
-                  style={{ borderColor: 'rgba(255,78,46,0.2)', color: '#FF4E2E' }}
+                  style={{ borderColor: 'rgba(244,63,94,0.25)', color: 'var(--color-favorite)' }}
                   onClick={handleResetLibrary}
                   disabled={isScanning}
                 >
@@ -954,7 +954,7 @@ export default function App(): React.JSX.Element {
 
             <div className="settings-section" style={{ background: 'transparent', border: '1px solid rgba(255,255,255,0.01)', boxShadow: 'none', padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)', fontSize: '13px' }}>
-                <Info size={16} weight="light" color="var(--accent)" />
+                <Info size={16} weight="light" color="var(--text-tertiary)" />
                 <span>Supports MP3, FLAC, WAV, M4A, OGG, AAC, WMA audio formats.</span>
               </div>
             </div>
@@ -1200,7 +1200,7 @@ export default function App(): React.JSX.Element {
                               className="btn-control"
                               title="Add to Playlist"
                               onClick={() => handleAddToPlaylist(activePlaylist, track)}
-                              style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--accent)', borderColor: 'rgba(255, 78, 46, 0.2)' }}
+                              style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--text-primary)', border: '1px solid rgba(255, 255, 255, 0.12)' }}
                             >
                               <span>Add</span>
                             </button>

@@ -198,21 +198,27 @@ export default function Sidebar({
         )}
       </div>
 
-      {/* Filter Pills */}
-      <div className="sidebar-filters">
+      {/* Segmented Filter Control */}
+      <div className="sidebar-filters" role="tablist" aria-label="Library filter">
         <button
+          role="tab"
+          aria-selected={filter === 'all'}
           className={`filter-pill ${filter === 'all' ? 'active' : ''}`}
           onClick={() => setFilter('all')}
         >
           All
         </button>
         <button
+          role="tab"
+          aria-selected={filter === 'playlists'}
           className={`filter-pill ${filter === 'playlists' ? 'active' : ''}`}
           onClick={() => setFilter('playlists')}
         >
           Playlists
         </button>
         <button
+          role="tab"
+          aria-selected={filter === 'albums'}
           className={`filter-pill ${filter === 'albums' ? 'active' : ''}`}
           onClick={() => setFilter('albums')}
         >

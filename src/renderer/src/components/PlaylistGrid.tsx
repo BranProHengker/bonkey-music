@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Heart, MusicNotes, Sparkle, Disc, Users, Clock, Play, Pause } from '@phosphor-icons/react'
+import { Heart, MusicNotes, Disc, Play, Pause, CaretRight, Headphones } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 
@@ -29,10 +29,10 @@ export default function PlaylistGrid({
   onSelectFavorites,
   onSelectAllSongs
 }: PlaylistGridProps) {
-  const { currentTrack, isPlaying, togglePlay } = useAudioEngine()
+  const { currentTrack, isPlaying, togglePlay, playTrack } = useAudioEngine()
   const [featuredAlbum, setFeaturedAlbum] = useState<AlbumGroup | null>(null)
 
-  // Select a random featured album once when the albums list is loaded
+  // Pick a stable featured album once when albums load
   useEffect(() => {
     if (albums.length > 0 && !featuredAlbum) {
       const randomIndex = Math.floor(Math.random() * albums.length)
@@ -40,168 +40,181 @@ export default function PlaylistGrid({
     }
   }, [albums, featuredAlbum])
 
+  // Active spotlight item: currently playing track or featured album
+  const spotlightItem = currentTrack
+    ? {
+        type: 'playing' as const,
+        title: currentTrack.title,
+        subtitle: currentTrack.artist,
+        extra: currentTrack.album || 'Single',
+        coverArt: currentTrack.coverArt,
+        onAction: togglePlay
+      }
+    : featuredAlbum
+      ? {
+          type: 'featured' as const,
+          title: featuredAlbum.name,
+          subtitle: featuredAlbum.artist,
+          extra: `${featuredAlbum.tracks.length} tracks`,
+          coverArt: featuredAlbum.coverArt,
+          onAction: () => {
+            if (featuredAlbum.tracks.length > 0) {
+              playTrack(featuredAlbum.tracks[0], featuredAlbum.tracks)
+            }
+          }
+        }
+      : null
+
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <h2 className="section-title">Explore Bonkey Music</h2>
-      
-      <div className="bento-grid">
-        {/* Card 1: Favorites (Large Bento: 2 cols) */}
-        <div className="double-bezel-card bento-card-large bento-card-liked" onClick={onSelectFavorites}>
-          <div className="card-inner">
-            <Heart size={140} weight="fill" className="liked-card-bg-icon" />
-            <div className="card-gradient-overlay" />
-            <div className="card-overlay-content">
-              <span className="card-tag">Smart Playlist</span>
-              <h3 className="card-title">Liked Songs</h3>
-              <p className="card-desc">
-                Your curated soundtrack. {favoritesCount} tracks saved to favorites.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 2: Recently Played / Current Track (Standard Bento) */}
-        <div className="double-bezel-card bento-card-recent">
-          <div className="card-inner">
-            {currentTrack ? (
-              <>
-                {currentTrack.coverArt && (
-                  <img src={currentTrack.coverArt} className="recent-blur-bg" alt="" />
-                )}
-                <div className="recent-overlay" />
-                <div className="recent-content">
-                  <span className="card-tag">{isPlaying ? 'Now Playing' : 'Last Played'}</span>
-                  
-                  <div className="recent-track-info">
-                    <div className="recent-cover-wrapper">
-                      {currentTrack.coverArt ? (
-                        <img src={currentTrack.coverArt} alt={currentTrack.title} className="recent-cover" />
-                      ) : (
-                        <div className="recent-cover-placeholder">
-                          <Disc size={20} weight="light" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="recent-details">
-                      <span className="recent-title">{currentTrack.title}</span>
-                      <span className="recent-artist">{currentTrack.artist}</span>
-                    </div>
-                  </div>
-
-                  <button className="btn-recent-play" onClick={togglePlay} title={isPlaying ? 'Pause' : 'Play'}>
-                    {isPlaying ? <Pause size={16} weight="fill" /> : <Play size={16} weight="fill" />}
-                  </button>
-                </div>
-              </>
+    <div className="library-explorer-container">
+      {/* ─── Hero Spotlight Section ─── */}
+      {spotlightItem && (
+        <div className="library-spotlight-card">
+          <div className="spotlight-cover-container">
+            {spotlightItem.coverArt ? (
+              <img src={spotlightItem.coverArt} alt={spotlightItem.title} className="spotlight-cover" />
             ) : (
-              <div className="recent-empty" onClick={onSelectAllSongs}>
-                <Clock size={28} weight="light" color="var(--text-tertiary)" />
-                <span className="recent-empty-title">Ready to Listen</span>
-                <span className="recent-empty-desc">Choose any song to start playing</span>
+              <div className="spotlight-cover-placeholder">
+                <Disc size={44} weight="light" />
               </div>
             )}
-          </div>
-        </div>
-
-        {/* Card 3: Library Summary (Standard Bento: 1 col, 1 row) */}
-        <div className="double-bezel-card bento-card-stats" onClick={onSelectAllSongs}>
-          <div className="card-inner" style={{ padding: '24px', justifyContent: 'space-between' }}>
-            <div>
-              <span className="card-tag">Library Stats</span>
-              <h3 className="card-title" style={{ marginTop: '8px', fontSize: '20px' }}>Bonkey Library</h3>
-            </div>
-            
-            <div className="stats-metrik-list">
-              <div className="stats-metrik-item">
-                <div className="stats-metrik-icon"><MusicNotes size={16} weight="light" /></div>
-                <div className="stats-metrik-details">
-                  <div className="stats-metrik-value">{totalTracksCount}</div>
-                  <div className="stats-metrik-label">Total Tracks</div>
-                </div>
-              </div>
-              <div className="stats-metrik-item">
-                <div className="stats-metrik-icon"><Users size={16} weight="light" /></div>
-                <div className="stats-metrik-details">
-                  <div className="stats-metrik-value">{totalArtistsCount}</div>
-                  <div className="stats-metrik-label">Artists Indexed</div>
-                </div>
-              </div>
-              <div className="stats-metrik-item">
-                <div className="stats-metrik-icon"><Disc size={16} weight="light" /></div>
-                <div className="stats-metrik-details">
-                  <div className="stats-metrik-value">{albums.length}</div>
-                  <div className="stats-metrik-label">Albums Compiled</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="stats-browse-action">
-              <Sparkle size={14} weight="light" />
-              <span>Browse All Songs</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 4: Featured Album / Random Album (Banner Bento: 4 cols) */}
-        {featuredAlbum ? (
-          <div className="double-bezel-card bento-card-featured" onClick={() => onSelectAlbum(featuredAlbum.name)}>
-            <div className="card-inner">
-              {featuredAlbum.coverArt ? (
-                <img className="card-hero-image" src={featuredAlbum.coverArt} alt={featuredAlbum.name} />
+            <button
+              className="spotlight-play-btn"
+              onClick={spotlightItem.onAction}
+              title={isPlaying && spotlightItem.type === 'playing' ? 'Pause' : 'Play'}
+            >
+              {isPlaying && spotlightItem.type === 'playing' ? (
+                <Pause size={20} weight="fill" />
               ) : (
-                <div className="card-hero-image" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)' }}>
-                  <MusicNotes size={48} weight="light" color="var(--text-tertiary)" />
-                </div>
+                <Play size={20} weight="fill" />
               )}
-              <div className="card-gradient-overlay" />
-              <div className="card-overlay-content">
-                <span className="card-tag">Featured Album</span>
-                <h3 className="card-title">{featuredAlbum.name}</h3>
-                <p className="card-desc">{featuredAlbum.artist}</p>
-              </div>
+            </button>
+          </div>
+
+          <div className="spotlight-info">
+            <span className="spotlight-badge">
+              {spotlightItem.type === 'playing' ? 'Now Playing' : 'Spotlight Album'}
+            </span>
+            <h1 className="spotlight-title">{spotlightItem.title}</h1>
+            <p className="spotlight-subtitle">{spotlightItem.subtitle}</p>
+            <p className="spotlight-extra">{spotlightItem.extra}</p>
+
+            <div className="spotlight-actions">
+              <button
+                className="btn-spotlight-primary"
+                onClick={
+                  spotlightItem.type === 'featured' && featuredAlbum
+                    ? () => onSelectAlbum(featuredAlbum.name)
+                    : spotlightItem.onAction
+                }
+              >
+                <span>
+                  {spotlightItem.type === 'featured' ? 'View Album' : isPlaying ? 'Pause' : 'Resume'}
+                </span>
+                <CaretRight size={14} weight="bold" />
+              </button>
+
+              <button className="btn-spotlight-secondary" onClick={onSelectFavorites}>
+                <Heart size={16} weight={favoritesCount > 0 ? 'fill' : 'regular'} color={favoritesCount > 0 ? 'var(--color-favorite)' : 'var(--text-tertiary)'} />
+                <span>Liked Songs ({favoritesCount})</span>
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="double-bezel-card" style={{ gridColumn: 'span 4' }}>
-            <div className="card-inner" style={{ padding: '20px', justifyContent: 'center', alignItems: 'center', textAlign: 'center' }}>
-              <MusicNotes size={32} weight="light" color="var(--text-tertiary)" />
-              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '8px' }}>Scan a folder to compile albums</p>
-            </div>
+        </div>
+      )}
+
+      {/* ─── Hardware-Inspired Audio Metrics Bar ─── */}
+      <div className="library-metrics-bar">
+        <div className="metrics-group">
+          <div className="metric-item">
+            <Headphones size={15} weight="light" className="metric-icon" />
+            <span className="metric-label">Tracks</span>
+            <span className="metric-val">{totalTracksCount}</span>
           </div>
-        )}
+          <div className="metric-divider" />
+          <div className="metric-item">
+            <span className="metric-label">Artists</span>
+            <span className="metric-val">{totalArtistsCount}</span>
+          </div>
+          <div className="metric-divider" />
+          <div className="metric-item">
+            <Disc size={15} weight="light" className="metric-icon" />
+            <span className="metric-label">Albums</span>
+            <span className="metric-val">{albums.length}</span>
+          </div>
+        </div>
+
+        <button className="metrics-browse-btn" onClick={onSelectAllSongs}>
+          <span>View All Tracks</span>
+          <CaretRight size={13} weight="bold" />
+        </button>
       </div>
 
-      {/* Album row grid (standard card grids) */}
-      {albums.length > 1 && (
-        <div style={{ marginTop: '20px' }}>
-          <h3 className="section-title" style={{ fontSize: '16px', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-secondary)' }}>
-            Albums
-          </h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '16px' }}>
-            {albums.slice(1).map((album) => (
+      {/* ─── Albums Showcase Grid ─── */}
+      <div className="albums-section">
+        <div className="section-header-row">
+          <h2 className="section-heading">Albums</h2>
+          <span className="section-count">{albums.length} collections</span>
+        </div>
+
+        {albums.length === 0 ? (
+          <div className="albums-empty">
+            <Disc size={32} weight="light" />
+            <p>No albums indexed yet</p>
+          </div>
+        ) : (
+          <div className="albums-grid">
+            {albums.map((album) => (
               <div
                 key={album.name}
-                className="double-bezel-card playlist-card-standard"
+                className="album-card"
                 onClick={() => onSelectAlbum(album.name)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onSelectAlbum(album.name)
+                  }
+                }}
               >
-                <div className="art-wrapper">
+                <div className="album-artwork-wrap">
                   {album.coverArt ? (
-                    <img src={album.coverArt} alt={album.name} />
+                    <img src={album.coverArt} alt={album.name} className="album-artwork" loading="lazy" />
                   ) : (
-                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg-surface)' }}>
-                      <MusicNotes size={32} weight="light" color="var(--text-tertiary)" />
+                    <div className="album-artwork-placeholder">
+                      <MusicNotes size={32} weight="light" />
                     </div>
                   )}
+                  <button
+                    className="album-hover-play"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (album.tracks.length > 0) {
+                        playTrack(album.tracks[0], album.tracks)
+                      }
+                    }}
+                    title={`Play ${album.name}`}
+                  >
+                    <Play size={18} weight="fill" />
+                  </button>
                 </div>
-                <div className="playlist-info">
-                  <span className="playlist-name">{album.name}</span>
-                  <span className="playlist-meta">{album.artist}</span>
+
+                <div className="album-meta">
+                  <h3 className="album-title" title={album.name}>
+                    {album.name}
+                  </h3>
+                  <p className="album-artist" title={album.artist}>
+                    {album.artist}
+                  </p>
+                  <span className="album-tracks-count">
+                    {album.tracks.length} {album.tracks.length === 1 ? 'track' : 'tracks'}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   )
 }

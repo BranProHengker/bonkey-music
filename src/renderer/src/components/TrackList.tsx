@@ -199,7 +199,7 @@ export default function TrackList({
 
             <div className="track-album">{track.album}</div>
             
-            <div className="track-genre">{track.genre || '—'}</div>
+            <div className="track-genre">{track.genre || '-'}</div>
 
             <div className="track-duration" style={{ textAlign: 'right' }}>
               {formatDuration(track.duration)}

@@ -5,6 +5,7 @@ import { TrackMeta } from '../hooks/useAudioEngine'
 interface LyricLine {
   time: number // in seconds (-1 for plain unsynced lines)
   text: string
+  subText?: string // Romaji / secondary translation line for dual-line lyrics
   isSpacer?: boolean
 }
 
@@ -15,8 +16,9 @@ interface LyricsViewProps {
   onClose: () => void
 }
 
-interface LyricLineItemProps { 
+interface LyricLineItemProps {
   text: string
+  subText?: string
   time: number
   isActive: boolean
   isPast: boolean
@@ -24,14 +26,15 @@ interface LyricLineItemProps {
 }
 
 const LyricLineItem = forwardRef<HTMLDivElement, LyricLineItemProps>(
-  ({ text, time, isActive, isPast, onClick }, ref) => {
+  ({ text, subText, time, isActive, isPast, onClick }, ref) => {
     return (
       <div
         ref={ref}
-        className={`lyric-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${time === -1 ? 'no-sync' : ''}`}
+        className={`lyric-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${time === -1 ? 'no-sync' : ''} ${subText ? 'dual-line' : ''}`}
         onClick={onClick}
       >
-        {text}
+        <div className="lyric-main-text">{text}</div>
+        {subText && <div className="lyric-sub-text">{subText}</div>}
       </div>
     )
   }
@@ -76,7 +79,7 @@ export default function LyricsView({
     }
 
     const rawLines = rawLyrics.split(/\r?\n/)
-    const timedLines: LyricLine[] = []
+    const rawTimedLines: { time: number; text: string }[] = []
     const plainLines: LyricLine[] = []
     let foundAnyTimestamp = false
 
@@ -99,7 +102,7 @@ export default function LyricsView({
           const ms = msStr ? parseInt(msStr, 10) : 0
           const time = minutes * 60 + seconds + (msStr ? ms / (msStr.length === 3 ? 1000 : 100) : 0)
 
-          timedLines.push({
+          rawTimedLines.push({
             time,
             text: displayText
           })
@@ -126,9 +129,31 @@ export default function LyricsView({
       }
     }
 
-    if (foundAnyTimestamp && timedLines.length > 0) {
-      // Sort parsed timed lyrics chronologically
-      timedLines.sort((a, b) => a.time - b.time)
+    if (foundAnyTimestamp && rawTimedLines.length > 0) {
+      // Sort parsed timed lyrics chronologically (stable sort preserves original order for identical timestamps)
+      const sortedTimed = rawTimedLines.slice().sort((a, b) => a.time - b.time)
+
+      // Group identical timestamps together as dual-line lyrics (e.g. Original + Romaji/Translation)
+      const timedLines: LyricLine[] = []
+      for (const item of sortedTimed) {
+        if (
+          timedLines.length > 0 &&
+          Math.abs(timedLines[timedLines.length - 1].time - item.time) < 0.05
+        ) {
+          const lastLine = timedLines[timedLines.length - 1]
+          if (lastLine.subText) {
+            lastLine.subText += '\n' + item.text
+          } else {
+            lastLine.subText = item.text
+          }
+        } else {
+          timedLines.push({
+            time: item.time,
+            text: item.text
+          })
+        }
+      }
+
       return { lines: timedLines, hasTimestamps: true }
     } else {
       // Clean up leading and trailing spacers for plain text
@@ -253,7 +278,6 @@ export default function LyricsView({
             </div>
           ) : (
             <>
-
               {/* Mode 1: Synced karaoke style lyrics */}
               {isSyncedActive ? (
                 <div className="lyrics-scroller">
@@ -266,6 +290,7 @@ export default function LyricsView({
                         key={idx}
                         ref={isActive ? activeLineRef : null}
                         text={line.text}
+                        subText={line.subText}
                         time={line.time}
                         isActive={isActive}
                         isPast={isPast}
@@ -283,7 +308,8 @@ export default function LyricsView({
                     }
                     return (
                       <div key={idx} className="lyrics-plain-line">
-                        {line.text}
+                        <div className="lyrics-plain-main">{line.text}</div>
+                        {line.subText && <div className="lyrics-plain-sub">{line.subText}</div>}
                       </div>
                     )
                   })}
