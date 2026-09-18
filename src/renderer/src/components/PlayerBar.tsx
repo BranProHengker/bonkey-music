@@ -343,6 +343,16 @@ export default function PlayerBar({
                     </div>
                   </div>
                 )}
+
+                <button
+                  className="dropdown-item"
+                  onClick={() => {
+                    window.api.openFileLocation(currentTrack.filePath)
+                    setIsPlusMenuOpen(false)
+                  }}
+                >
+                  Open File Location
+                </button>
               </div>
             )}
           </div>

@@ -15,6 +15,7 @@ interface MusicAPI {
   exportPlaylist: (name: string, filePaths: string[]) => Promise<{ success: boolean; destination?: string; reason?: string }>
   removeLibraryFolder: (path: string) => Promise<TrackMeta[]>
   selectImage: () => Promise<string | null>
+  openFileLocation: (filePath: string) => Promise<boolean>
 }
 
 interface TrackMeta {

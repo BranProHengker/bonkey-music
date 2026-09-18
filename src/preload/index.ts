@@ -22,7 +22,9 @@ const musicAPI = {
   removeLibraryFolder: (path: string): Promise<unknown[]> =>
     ipcRenderer.invoke('remove-library-folder', path),
   selectImage: (): Promise<string | null> =>
-    ipcRenderer.invoke('select-image')
+    ipcRenderer.invoke('select-image'),
+  openFileLocation: (filePath: string): Promise<boolean> =>
+    ipcRenderer.invoke('open-file-location', filePath)
 }
 
 // Use contextBridge to expose APIs securely

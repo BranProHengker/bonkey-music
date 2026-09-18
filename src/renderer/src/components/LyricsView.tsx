@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, memo, forwardRef } from 'react'
-import { MusicNotes, X } from '@phosphor-icons/react'
+import { MusicNotes, X, SidebarSimple } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface LyricLine {
@@ -14,6 +14,8 @@ interface LyricsViewProps {
   currentTime: number
   seek: (time: number) => void
   onClose: () => void
+  isQueueOpen?: boolean
+  onCloseQueue?: () => void
 }
 
 interface LyricLineItemProps {
@@ -22,15 +24,18 @@ interface LyricLineItemProps {
   time: number
   isActive: boolean
   isPast: boolean
+  distance: number
   onClick: () => void
 }
 
 const LyricLineItem = forwardRef<HTMLDivElement, LyricLineItemProps>(
-  ({ text, subText, time, isActive, isPast, onClick }, ref) => {
+  ({ text, subText, time, isActive, isPast, distance, onClick }, ref) => {
+    const clampedDistance = time === -1 ? -1 : Math.min(3, Math.max(0, distance))
     return (
       <div
         ref={ref}
         className={`lyric-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${time === -1 ? 'no-sync' : ''} ${subText ? 'dual-line' : ''}`}
+        data-distance={clampedDistance}
         onClick={onClick}
       >
         <div className="lyric-main-text">{text}</div>
@@ -47,12 +52,53 @@ export default function LyricsView({
   currentTrack,
   currentTime,
   seek,
-  onClose
+  onClose,
+  isQueueOpen = false,
+  onCloseQueue
 }: LyricsViewProps): React.JSX.Element {
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
+
+  // Persistent user preference for manual cover visibility
+  const [userCoverHidden, setUserCoverHidden] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('bonkey_lyrics_hide_cover') === 'true'
+    } catch {
+      return false
+    }
+  })
+
+  // Cover is hidden either if user manually hid it, or automatically when Queue is opened
+  const isCoverHidden = userCoverHidden || isQueueOpen
+
+  const handleToggleCover = () => {
+    setUserCoverHidden((prev) => {
+      const next = !prev
+      try {
+        localStorage.setItem('bonkey_lyrics_hide_cover', String(next))
+      } catch {}
+      return next
+    })
+  }
+
   const containerRef = useRef<HTMLDivElement>(null)
   const plainContainerRef = useRef<HTMLDivElement>(null)
   const activeLineRef = useRef<HTMLDivElement>(null)
+
+  // Close with ESC key: closes Queue first if open, else closes Lyrics overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        if (isQueueOpen && onCloseQueue) {
+          onCloseQueue()
+        } else {
+          onClose()
+        }
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [onClose, isQueueOpen, onCloseQueue])
 
   // Fetch lyrics when track changes
   useEffect(() => {
@@ -180,50 +226,94 @@ export default function LyricsView({
   // Is active view mode synced?
   const isSyncedActive = hasTimestamps
 
+  // Karaoke lead time: triggers active line ~220ms earlier so lyrics are ready ahead of vocals
+  const LYRIC_LEAD_TIME = 0.22
+
   // Determine current active lyric line for synced lyrics
   const activeIndex = useMemo(() => {
     if (!isSyncedActive || lyricsList.length === 0) return -1
+    const targetTime = currentTime + LYRIC_LEAD_TIME
     const firstTimedLine = lyricsList.find((l) => l.time >= 0)
-    if (!firstTimedLine || currentTime < firstTimedLine.time) return -1
+    if (!firstTimedLine || targetTime < firstTimedLine.time) return -1
 
     for (let i = lyricsList.length - 1; i >= 0; i--) {
-      if (lyricsList[i].time >= 0 && currentTime >= lyricsList[i].time) {
+      if (lyricsList[i].time >= 0 && targetTime >= lyricsList[i].time) {
         return i
       }
     }
     return -1
   }, [isSyncedActive, lyricsList, currentTime])
 
-  // Smooth scroll active lyric line into center of container
+  // Hardware-accelerated compositor transform positioning
+  const [targetTranslateY, setTargetTranslateY] = useState(0)
+  const [userOffset, setUserOffset] = useState(0)
+  const [isUserInteracting, setIsUserInteracting] = useState(false)
+  const userScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Recalculate target translate position when activeIndex changes
   useEffect(() => {
-    if (!isSyncedActive) return
+    if (!isSyncedActive || !containerRef.current) return
 
     if (activeIndex === -1) {
-      if (containerRef.current) {
-        containerRef.current.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        })
-      }
-    } else if (activeLineRef.current && containerRef.current) {
+      setTargetTranslateY(containerRef.current.clientHeight * 0.25)
+      return
+    }
+
+    if (activeLineRef.current && containerRef.current) {
       const activeLine = activeLineRef.current
       const container = containerRef.current
 
       const activeTop = activeLine.offsetTop
       const activeHeight = activeLine.offsetHeight
-      const containerHeight = container.offsetHeight
+      const containerHeight = container.clientHeight
 
-      const targetScrollTop = activeTop - containerHeight / 2 + activeHeight / 2
-
-      container.scrollTo({
-        top: Math.max(0, targetScrollTop),
-        behavior: 'smooth'
-      })
+      // Center the active line perfectly in view
+      const targetCenter = containerHeight / 2 - (activeTop + activeHeight / 2)
+      setTargetTranslateY(targetCenter)
     }
-  }, [isSyncedActive, activeIndex])
+  }, [isSyncedActive, activeIndex, isCoverHidden, isQueueOpen])
+
+  // Keep center aligned during window resize
+  useEffect(() => {
+    function handleResize() {
+      if (!isSyncedActive || !containerRef.current || !activeLineRef.current) return
+      const activeLine = activeLineRef.current
+      const container = containerRef.current
+      const targetCenter = container.clientHeight / 2 - (activeLine.offsetTop + activeLine.offsetHeight / 2)
+      setTargetTranslateY(targetCenter)
+    }
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [isSyncedActive])
+
+  // Reset scroll offset on track change
+  useEffect(() => {
+    setUserOffset(0)
+    setIsUserInteracting(false)
+  }, [currentTrack])
+
+  // User manual wheel scroll handling
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!isSyncedActive) return
+    setIsUserInteracting(true)
+    setUserOffset((prev) => prev - e.deltaY * 0.85)
+
+    if (userScrollTimeoutRef.current) {
+      clearTimeout(userScrollTimeoutRef.current)
+    }
+    userScrollTimeoutRef.current = setTimeout(() => {
+      setIsUserInteracting(false)
+      setUserOffset(0) // Smoothly glides back to center
+    }, 2500)
+  }
 
   const handleLineClick = (time: number) => {
     if (time >= 0) {
+      setIsUserInteracting(false)
+      setUserOffset(0)
+      if (userScrollTimeoutRef.current) {
+        clearTimeout(userScrollTimeoutRef.current)
+      }
       seek(time)
     }
   }
@@ -231,7 +321,7 @@ export default function LyricsView({
   const coverArtSrc = currentTrack?.coverArt || ''
 
   return (
-    <div className="lyrics-view-overlay">
+    <div className={`lyrics-view-overlay ${isQueueOpen ? 'queue-open' : ''}`}>
       {/* Blurred background cover art */}
       <div
         className="lyrics-bg-blur"
@@ -239,35 +329,74 @@ export default function LyricsView({
       />
       <div className="lyrics-darkener" />
 
-      {/* Close button */}
-      <button className="lyrics-close-btn" onClick={onClose} title="Close Lyrics">
-        <X size={20} weight="bold" />
-      </button>
+      {/* Action controls: Close (ESC) and Toggle Cover Art */}
+      <div className="lyrics-top-actions">
+        <button
+          className="lyrics-action-btn-circle"
+          onClick={onClose}
+          title="Close Lyrics (Esc)"
+          aria-label="Close Lyrics (Esc)"
+        >
+          <X size={18} weight="bold" />
+        </button>
+        <button
+          className={`lyrics-action-btn-circle ${userCoverHidden ? 'active' : ''}`}
+          onClick={handleToggleCover}
+          title={userCoverHidden ? 'Show Album Cover' : 'Hide Cover (Full Lyrics Mode)'}
+          aria-label={userCoverHidden ? 'Show Album Cover' : 'Hide Cover'}
+        >
+          <SidebarSimple size={18} weight={userCoverHidden ? 'fill' : 'bold'} />
+        </button>
+      </div>
 
-      <div className="lyrics-content-container">
-        {/* Left column: Big cover art and info */}
-        <div className="lyrics-left-info">
-          <div className="lyrics-cover-wrapper">
-            {coverArtSrc ? (
-              <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-big-cover" />
-            ) : (
-              <div className="lyrics-big-cover-placeholder">
-                <MusicNotes size={64} weight="thin" color="rgba(255,255,255,0.2)" />
-              </div>
-            )}
+      <div className={`lyrics-content-container ${isCoverHidden ? 'cover-hidden' : ''} ${isQueueOpen ? 'with-queue' : ''}`}>
+        {/* Left column: Responsive cover art and info (hidden in full lyrics mode) */}
+        {!isCoverHidden && (
+          <div className="lyrics-left-info">
+            <div className="lyrics-cover-wrapper">
+              {coverArtSrc ? (
+                <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-big-cover" />
+              ) : (
+                <div className="lyrics-big-cover-placeholder">
+                  <MusicNotes size={64} weight="thin" color="rgba(255,255,255,0.2)" />
+                </div>
+              )}
+            </div>
+            <div className="lyrics-track-meta">
+              <h1 className="lyrics-track-title" title={currentTrack?.title}>{currentTrack?.title || 'Unknown Title'}</h1>
+              <p className="lyrics-track-artist" title={currentTrack?.artist}>{currentTrack?.artist || 'Unknown Artist'}</p>
+              <p className="lyrics-track-album" title={currentTrack?.album}>{currentTrack?.album || 'Unknown Album'}</p>
+              {(currentTrack?.lossless || currentTrack?.container) && (
+                <div className="lyrics-spec-chip">
+                  <span>{currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase() || 'Audio'}</span>
+                  {currentTrack.bitsPerSample && currentTrack.sampleRate ? (
+                    <span className="spec-dot">• {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz</span>
+                  ) : null}
+                </div>
+              )}
+            </div>
           </div>
-          <div className="lyrics-track-meta">
-            <h1 className="lyrics-track-title">{currentTrack?.title || 'Unknown Title'}</h1>
-            <p className="lyrics-track-artist">{currentTrack?.artist || 'Unknown Artist'}</p>
-            <p className="lyrics-track-album">{currentTrack?.album || 'Unknown Album'}</p>
-          </div>
-        </div>
+        )}
 
         {/* Right column: Lyrics view */}
         <div
           className={`lyrics-right-list ${!isSyncedActive ? 'plain-mode' : ''}`}
           ref={isSyncedActive ? containerRef : plainContainerRef}
+          onWheel={handleWheel}
         >
+          {/* Compact track header when cover is hidden */}
+          {isCoverHidden && currentTrack && (
+            <div className="lyrics-compact-header">
+              <span className="lyrics-compact-title">{currentTrack.title}</span>
+              <span className="lyrics-compact-bullet">•</span>
+              <span className="lyrics-compact-artist">{currentTrack.artist}</span>
+              {(currentTrack.lossless || currentTrack.container) && (
+                <span className="lyrics-compact-chip">
+                  {currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}
+                </span>
+              )}
+            </div>
+          )}
           {lyricsList.length === 0 ? (
             <div className="lyrics-empty-state">
               <MusicNotes size={32} weight="light" style={{ marginBottom: '12px', opacity: 0.4 }} />
@@ -280,10 +409,19 @@ export default function LyricsView({
             <>
               {/* Mode 1: Synced karaoke style lyrics */}
               {isSyncedActive ? (
-                <div className="lyrics-scroller">
+                <div
+                  className="lyrics-scroller"
+                  style={{
+                    transform: `translate3d(0, ${Math.round(targetTranslateY + userOffset)}px, 0)`,
+                    transition: isUserInteracting
+                      ? 'transform 0.1s ease-out'
+                      : 'transform 0.38s cubic-bezier(0.16, 1, 0.3, 1)'
+                  }}
+                >
                   {lyricsList.map((line, idx) => {
                     const isActive = idx === activeIndex
                     const isPast = idx < activeIndex
+                    const distance = activeIndex === -1 ? 999 : Math.abs(idx - activeIndex)
 
                     return (
                       <MemoizedLyricLineItem
@@ -294,6 +432,7 @@ export default function LyricsView({
                         time={line.time}
                         isActive={isActive}
                         isPast={isPast}
+                        distance={distance}
                         onClick={() => handleLineClick(line.time)}
                       />
                     )

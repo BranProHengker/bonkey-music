@@ -4,6 +4,7 @@ import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface QueuePanelProps {
   isOpen: boolean
+  isLyricsOpen?: boolean
   onClose: () => void
   allTracks: TrackMeta[]
   onAddToQueue: (track: TrackMeta) => void
@@ -18,6 +19,7 @@ interface QueuePanelProps {
 
 export default function QueuePanel({
   isOpen,
+  isLyricsOpen = false,
   onClose,
   allTracks,
   onAddToQueue,
@@ -81,7 +83,7 @@ export default function QueuePanel({
   }
 
   return (
-    <div className={`queue-panel ${isOpen ? 'open' : 'closed'}`}>
+    <div className={`queue-panel ${isOpen ? 'open' : 'closed'} ${isLyricsOpen ? 'on-lyrics' : ''}`}>
       {/* Header */}
       <div className="queue-header">
         <span className="queue-title">Play Queue</span>

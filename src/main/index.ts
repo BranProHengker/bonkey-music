@@ -9,7 +9,9 @@ import {
   Tray,
   Menu
 } from 'electron'
-import { join, basename } from 'path'
+import { join, basename, dirname, resolve } from 'path'
+import { pathToFileURL } from 'url'
+import { exec, spawn } from 'child_process'
 import { readFile, writeFile, readdir, copyFile, mkdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
@@ -777,6 +779,65 @@ app.whenReady().then(async () => {
     } catch (err: any) {
       console.error('Export playlist error:', err)
       return { success: false, reason: err.message || 'Unknown error' }
+    }
+  })
+
+  // ─── IPC: Open File Location (Robust Cross-platform + Hyprland) ──
+  ipcMain.handle('open-file-location', async (_event, filePath: string) => {
+    if (!filePath) return false
+    try {
+      const resolvedPath = resolve(filePath)
+      if (!existsSync(resolvedPath)) {
+        console.warn('[OpenFileLocation] File does not exist:', resolvedPath)
+        return false
+      }
+
+      // 1. Non-Linux (Windows/macOS) native handler
+      if (process.platform !== 'linux') {
+        shell.showItemInFolder(resolvedPath)
+        return true
+      }
+
+      // 2. Linux (Hyprland, Wayland, X11):
+      // D-Bus org.freedesktop.FileManager1.ShowItems highlights the exact file in Thunar, Dolphin, Nautilus
+      const parentFolder = dirname(resolvedPath)
+      const fileUrl = pathToFileURL(resolvedPath).href
+
+      try {
+        const dbusCmd = `dbus-send --session --dest=org.freedesktop.FileManager1 --type=method_call /org/freedesktop/FileManager1 org.freedesktop.FileManager1.ShowItems array:string:"${fileUrl}" string:""`
+        const dbusSuccess = await new Promise<boolean>((res) => {
+          exec(dbusCmd, { timeout: 1200 }, (error) => {
+            res(!error)
+          })
+        })
+        if (dbusSuccess) return true
+      } catch (err) {
+        console.warn('[OpenFileLocation] D-Bus ShowItems attempt error:', err)
+      }
+
+      // 3. Fallback: shell.showItemInFolder
+      try {
+        shell.showItemInFolder(resolvedPath)
+      } catch {}
+
+      // 4. Fallback: xdg-open on parent folder (Guaranteed to open file manager in Hyprland)
+      try {
+        const child = spawn('xdg-open', [parentFolder], {
+          detached: true,
+          stdio: 'ignore'
+        })
+        child.unref()
+        return true
+      } catch (err) {
+        console.warn('[OpenFileLocation] xdg-open fallback error:', err)
+      }
+
+      // 5. Final fallback: shell.openPath on parent folder
+      await shell.openPath(parentFolder)
+      return true
+    } catch (err) {
+      console.error('[OpenFileLocation] Error opening file location:', err)
+      return false
     }
   })
 

@@ -1253,6 +1253,7 @@ export default function App(): React.JSX.Element {
       {/* Queue Panel */}
       <QueuePanel
         isOpen={isQueueOpen}
+        isLyricsOpen={isLyricsOpen}
         onClose={() => setIsQueueOpen(false)}
         allTracks={tracks}
         onAddToQueue={addToQueue}
@@ -1272,6 +1273,8 @@ export default function App(): React.JSX.Element {
           currentTime={currentTime}
           seek={seek}
           onClose={() => setIsLyricsOpen(false)}
+          isQueueOpen={isQueueOpen}
+          onCloseQueue={() => setIsQueueOpen(false)}
         />
       )}
 

@@ -301,6 +301,17 @@ export default function TrackList({
                         </div>
                       </div>
                     )}
+
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        window.api.openFileLocation(track.filePath)
+                        setActiveMenuTrack(null)
+                      }}
+                    >
+                      Open File Location
+                    </button>
+
                     {currentPlaylistName && onRemoveFromPlaylist && (
                       <button
                         className="dropdown-item danger"
@@ -400,6 +411,17 @@ export default function TrackList({
                 </div>
               </div>
             )}
+
+            <button
+              className="dropdown-item"
+              onClick={() => {
+                window.api.openFileLocation(track.filePath)
+                setContextMenu(null)
+              }}
+            >
+              Open File Location
+            </button>
+
             {currentPlaylistName && onRemoveFromPlaylist && (
               <button
                 className="dropdown-item danger"
