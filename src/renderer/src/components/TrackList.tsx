@@ -10,9 +10,9 @@ interface TrackListProps {
   favorites: string[]
   onToggleFavorite: (filePath: string) => void
   onAddToQueue?: (track: TrackMeta) => void
-  sortField?: 'title' | 'artist' | 'album' | 'genre' | 'duration' | null
+  sortField?: 'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt' | null
   sortOrder?: 'asc' | 'desc'
-  onSort?: (field: 'title' | 'artist' | 'album' | 'genre' | 'duration') => void
+  onSort?: (field: 'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt') => void
   playlists?: string[]
   onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
   onAddToNewPlaylist?: (track: TrackMeta) => void
@@ -79,7 +79,7 @@ export default function TrackList({
     return `${m}:${s < 10 ? '0' : ''}${s}`
   }
 
-  const renderSortIndicator = (field: 'title' | 'artist' | 'album' | 'genre' | 'duration') => {
+  const renderSortIndicator = (field: 'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt') => {
     if (sortField !== field) return null
     return sortOrder === 'asc' ? ' ▲' : ' ▼'
   }

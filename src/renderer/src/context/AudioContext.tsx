@@ -15,6 +15,7 @@ export interface TrackMeta {
   bitsPerSample?: number
   lossless?: boolean
   container?: string
+  addedAt?: number
 }
 
 export interface AudioContextType {

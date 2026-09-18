@@ -32,6 +32,7 @@ interface TrackMeta {
   bitsPerSample?: number
   lossless?: boolean
   container?: string
+  addedAt?: number
 }
 
 declare global {

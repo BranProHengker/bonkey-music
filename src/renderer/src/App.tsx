@@ -12,7 +12,8 @@ import {
   DownloadSimple,
   MusicNotes,
   Play,
-  X
+  X,
+  ClockCounterClockwise
 } from '@phosphor-icons/react'
 import iconApp from './assets/iconapp.png'
 
@@ -57,7 +58,7 @@ export default function App(): React.JSX.Element {
   } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
-  const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings'>('library')
+  const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings' | 'latest'>('library')
   const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
@@ -71,7 +72,7 @@ export default function App(): React.JSX.Element {
   const [activePlaylist, setActivePlaylist] = useState<string | null>(null)
   const [activeAlbum, setActiveAlbum] = useState<string | null>(null)
   const [isScanning, setIsScanning] = useState(false)
-  const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'genre' | 'duration' | null>(null)
+  const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt' | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [playlistSearch, setPlaylistSearch] = useState('')
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false)
@@ -81,7 +82,7 @@ export default function App(): React.JSX.Element {
 
   // ─── Navigation History ──────────────────────────────────────────────
   const [history, setHistory] = useState<Array<{
-    currentView: 'library' | 'favorites' | 'settings'
+    currentView: 'library' | 'favorites' | 'settings' | 'latest'
     activePlaylist: string | null
     activeAlbum: string | null
   }>>([{ currentView: 'library', activePlaylist: null, activeAlbum: null }])
@@ -660,6 +661,9 @@ export default function App(): React.JSX.Element {
     // 1. Filter by Main View
     if (currentView === 'favorites') {
       result = result.filter((t) => favorites.includes(t.filePath))
+    } else if (currentView === 'latest') {
+      // Sort newest first by default
+      result = [...result].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
     } else if (currentView === 'library') {
       if (activePlaylist) {
         const pFilePaths = playlistTracks[activePlaylist] || []
@@ -683,8 +687,8 @@ export default function App(): React.JSX.Element {
     // 3. Sort tracks if sortField is active
     if (sortField) {
       result.sort((a, b) => {
-        const valA = a[sortField] || ''
-        const valB = b[sortField] || ''
+        const valA = a[sortField] || 0
+        const valB = b[sortField] || 0
 
         if (typeof valA === 'string' && typeof valB === 'string') {
           return sortOrder === 'asc'
@@ -692,7 +696,7 @@ export default function App(): React.JSX.Element {
             : valB.localeCompare(valA)
         }
 
-        // Numbers (duration)
+        // Numbers (duration, addedAt)
         return sortOrder === 'asc'
           ? (valA as number) - (valB as number)
           : (valB as number) - (valA as number)
@@ -730,11 +734,14 @@ export default function App(): React.JSX.Element {
     playTrack(track, displayedTracks)
   }
 
-  // Go back to full library view when browsing specific album or playlist
+  // Go back to full library view when browsing specific album, playlist, or latest
   const handleClearFilters = () => {
     setActivePlaylist(null)
     setActiveAlbum(null)
     setSearchQuery('')
+    if (currentView === 'latest') {
+      setCurrentView('library')
+    }
   }
 
   return (
@@ -778,13 +785,15 @@ export default function App(): React.JSX.Element {
         playlistTracks={playlistTracks}
         playlistCovers={playlistCovers}
         tracks={tracks}
+        onPlayTrack={handlePlayTrack}
+        currentTrack={currentTrack}
       />
 
       {/* Main Panel */}
       <main className="main-content">
         {/* Search Bar / Action Bar */}
         <div className="search-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {(activeAlbum || activePlaylist || searchQuery) && (
+          {(activeAlbum || activePlaylist || searchQuery || currentView === 'latest') && (
             <button
               className="btn-control"
               onClick={handleClearFilters}
@@ -978,7 +987,7 @@ export default function App(): React.JSX.Element {
           /* Dashboard or Track List Views */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
             {/* Header section if active filter is set */}
-            {((activeAlbum || searchQuery) && !activePlaylist) && (
+            {((activeAlbum || searchQuery) && !activePlaylist && currentView !== 'latest') && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div>
@@ -1111,8 +1120,8 @@ export default function App(): React.JSX.Element {
               />
             )}
 
-            {/* Track rows (rendered when browsing an album, playlist, searching, or favorited) */}
-            {(currentView === 'favorites' || activeAlbum || activePlaylist || searchQuery) && (
+            {/* Track rows (rendered when browsing an album, playlist, searching, favorited, or latest) */}
+            {(currentView === 'favorites' || currentView === 'latest' || activeAlbum || activePlaylist || searchQuery) && (
               <div>
                 {currentView === 'favorites' && !searchQuery && (
                   <div style={{ marginBottom: '24px' }}>
@@ -1123,6 +1132,31 @@ export default function App(): React.JSX.Element {
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {displayedTracks.length} tracks saved
                     </span>
+                  </div>
+                )}
+
+                {currentView === 'latest' && !searchQuery && (
+                  <div style={{ marginBottom: '24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                      <h2 className="section-title" style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                        <ClockCounterClockwise size={22} weight="bold" />
+                        Recently Added
+                      </h2>
+                      <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
+                        {displayedTracks.length} tracks • Sorted by newest added
+                      </span>
+                    </div>
+
+                    {displayedTracks.length > 0 && (
+                      <button
+                        className="btn-spotlight-primary"
+                        onClick={() => playTrack(displayedTracks[0], displayedTracks)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '8px' }}
+                      >
+                        <Play size={16} weight="fill" />
+                        <span>Play All</span>
+                      </button>
+                    )}
                   </div>
                 )}
 

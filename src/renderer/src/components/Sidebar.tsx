@@ -1,11 +1,29 @@
 import { useState, useMemo, useEffect } from 'react'
-import { House, Heart, Gear, Plus, Disc, MusicNotes } from '@phosphor-icons/react'
+import { House, Heart, Gear, Plus, Disc, MusicNotes, ClockCounterClockwise } from '@phosphor-icons/react'
 import iconApp from '../assets/iconapp.png'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
+function formatRelativeTime(timestamp?: number): string {
+  if (!timestamp) return ''
+  const now = Date.now()
+  const diffMs = now - timestamp
+  const diffSec = Math.floor(diffMs / 1000)
+  if (diffSec < 60) return 'Just now'
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays === 1) return 'Yesterday'
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`
+  const d = new Date(timestamp)
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+}
+
 interface SidebarProps {
-  currentView: 'library' | 'favorites' | 'settings'
-  setCurrentView: (view: 'library' | 'favorites' | 'settings') => void
+  currentView: 'library' | 'favorites' | 'settings' | 'latest'
+  setCurrentView: (view: 'library' | 'favorites' | 'settings' | 'latest') => void
   libraryFolder: string | null
   playlists: string[]
   activePlaylist: string | null
@@ -19,6 +37,8 @@ interface SidebarProps {
   playlistTracks: Record<string, string[]>
   playlistCovers: Record<string, string>
   tracks: TrackMeta[]
+  onPlayTrack?: (track: TrackMeta, tracksContext?: TrackMeta[]) => void
+  currentTrack?: TrackMeta | null
 }
 
 export default function Sidebar({
@@ -36,9 +56,11 @@ export default function Sidebar({
   setActiveAlbum,
   playlistTracks,
   playlistCovers,
-  tracks
+  tracks,
+  onPlayTrack,
+  currentTrack
 }: SidebarProps) {
-  const [filter, setFilter] = useState<'all' | 'playlists' | 'albums'>('all')
+  const [filter, setFilter] = useState<'all' | 'playlists' | 'albums' | 'latest'>('all')
   const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -53,14 +75,59 @@ export default function Sidebar({
     }
   }, [isPlusMenuOpen])
 
-  const handleNavClick = (view: 'library' | 'favorites' | 'settings') => {
+  useEffect(() => {
+    if (currentView === 'latest' && filter !== 'latest') {
+      setFilter('latest')
+    } else if (currentView !== 'latest' && filter === 'latest') {
+      setFilter('all')
+    }
+  }, [currentView, filter])
+
+  const handleNavClick = (view: 'library' | 'favorites' | 'settings' | 'latest') => {
     setCurrentView(view)
     setActivePlaylist(null)
     setActiveAlbum(null)
   }
 
-  // Combine playlists and albums into a unified list, then filter & sort them
+  // Combine playlists and albums into a unified list, or show latest tracks
   const libraryItems = useMemo(() => {
+    if (filter === 'latest') {
+      const sortedTracks = [...tracks].sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0))
+      const allLatestItem = {
+        type: 'latest-header' as const,
+        id: 'latest-all-header',
+        name: 'All Recently Added',
+        subtitle: `${sortedTracks.length} tracks • Newest first`,
+        coverArt: null,
+        isActive: currentView === 'latest' && !activePlaylist && !activeAlbum,
+        onClick: () => {
+          setCurrentView('latest')
+          setActivePlaylist(null)
+          setActiveAlbum(null)
+        }
+      }
+
+      const trackItems = sortedTracks.map((track) => {
+        const timeStr = formatRelativeTime(track.addedAt)
+        return {
+          type: 'track' as const,
+          id: `track-${track.filePath}`,
+          name: track.title,
+          subtitle: timeStr ? `${track.artist} • ${timeStr}` : track.artist,
+          coverArt: track.coverArt,
+          isActive: currentTrack?.filePath === track.filePath,
+          onClick: () => {
+            setCurrentView('latest')
+            setActivePlaylist(null)
+            setActiveAlbum(null)
+            onPlayTrack?.(track, sortedTracks)
+          }
+        }
+      })
+
+      return [allLatestItem, ...trackItems]
+    }
+
     const playlistItems = playlists.map((name) => {
       const customCover = playlistCovers[name]
       let coverArt: string | null = customCover || null
@@ -113,7 +180,7 @@ export default function Sidebar({
       return combined.filter((item) => item.type === 'album')
     }
     return combined
-  }, [playlists, albums, playlistTracks, playlistCovers, tracks, activePlaylist, activeAlbum, filter, setCurrentView, setActivePlaylist, setActiveAlbum])
+  }, [playlists, albums, playlistTracks, playlistCovers, tracks, activePlaylist, activeAlbum, filter, currentView, currentTrack, onPlayTrack, setCurrentView, setActivePlaylist, setActiveAlbum])
 
   return (
     <aside className="sidebar">
@@ -204,7 +271,12 @@ export default function Sidebar({
           role="tab"
           aria-selected={filter === 'all'}
           className={`filter-pill ${filter === 'all' ? 'active' : ''}`}
-          onClick={() => setFilter('all')}
+          onClick={() => {
+            setFilter('all')
+            if (currentView === 'latest') {
+              setCurrentView('library')
+            }
+          }}
         >
           All
         </button>
@@ -212,7 +284,12 @@ export default function Sidebar({
           role="tab"
           aria-selected={filter === 'playlists'}
           className={`filter-pill ${filter === 'playlists' ? 'active' : ''}`}
-          onClick={() => setFilter('playlists')}
+          onClick={() => {
+            setFilter('playlists')
+            if (currentView === 'latest') {
+              setCurrentView('library')
+            }
+          }}
         >
           Playlists
         </button>
@@ -220,9 +297,27 @@ export default function Sidebar({
           role="tab"
           aria-selected={filter === 'albums'}
           className={`filter-pill ${filter === 'albums' ? 'active' : ''}`}
-          onClick={() => setFilter('albums')}
+          onClick={() => {
+            setFilter('albums')
+            if (currentView === 'latest') {
+              setCurrentView('library')
+            }
+          }}
         >
           Albums
+        </button>
+        <button
+          role="tab"
+          aria-selected={filter === 'latest'}
+          className={`filter-pill ${filter === 'latest' ? 'active' : ''}`}
+          onClick={() => {
+            setFilter('latest')
+            setCurrentView('latest')
+            setActivePlaylist(null)
+            setActiveAlbum(null)
+          }}
+        >
+          Latest
         </button>
       </div>
 
@@ -247,6 +342,10 @@ export default function Sidebar({
                       <Disc size={20} weight="light" />
                     </div>
                   )
+                ) : item.type === 'latest-header' ? (
+                  <div className="item-cover-placeholder" style={{ backgroundColor: 'rgba(255, 255, 255, 0.08)', color: 'var(--text-primary)' }}>
+                    <ClockCounterClockwise size={18} weight="bold" />
+                  </div>
                 ) : (
                   item.coverArt ? (
                     <img src={item.coverArt} alt={item.name} className="item-cover-img" />

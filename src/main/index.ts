@@ -31,6 +31,7 @@ export interface TrackMeta {
   bitsPerSample?: number
   lossless?: boolean
   container?: string
+  addedAt?: number
 }
 
 // ─── Custom Protocol ─────────────────────────────────────────────────
@@ -60,7 +61,29 @@ async function loadLibrary(): Promise<TrackMeta[]> {
   try {
     if (!existsSync(LIBRARY_PATH())) return []
     const data = await readFile(LIBRARY_PATH(), 'utf-8')
-    return JSON.parse(data) as TrackMeta[]
+    const tracks = JSON.parse(data) as TrackMeta[]
+
+    let needsMigration = false
+    for (const track of tracks) {
+      if (!track.addedAt) {
+        try {
+          if (existsSync(track.filePath)) {
+            const st = statSync(track.filePath)
+            track.addedAt = Math.round(st.mtimeMs || st.birthtimeMs || Date.now())
+          } else {
+            track.addedAt = Date.now()
+          }
+        } catch {
+          track.addedAt = Date.now()
+        }
+        needsMigration = true
+      }
+    }
+    if (needsMigration) {
+      saveLibrary(tracks).catch((err) => console.error('Error migrating addedAt:', err))
+    }
+
+    return tracks
   } catch {
     return []
   }
@@ -399,6 +422,12 @@ app.whenReady().then(async () => {
             coverArt = `data:${pic.format};base64,${base64}`
           }
 
+          let addedAt = Date.now()
+          try {
+            const st = statSync(file)
+            addedAt = Math.round(st.mtimeMs || st.birthtimeMs || Date.now())
+          } catch {}
+
           scannedTracks.push({
             filePath: file,
             title:
@@ -419,7 +448,8 @@ app.whenReady().then(async () => {
             sampleRate: format.sampleRate,
             bitsPerSample: format.bitsPerSample,
             lossless: format.lossless,
-            container: format.container
+            container: format.container,
+            addedAt
           })
         } catch {
           // Skip files that can't be parsed
@@ -661,6 +691,12 @@ app.whenReady().then(async () => {
             coverArt = `data:${pic.format};base64,${base64}`
           }
 
+          let addedAt = Date.now()
+          try {
+            const st = statSync(file)
+            addedAt = Math.round(st.mtimeMs || st.birthtimeMs || Date.now())
+          } catch {}
+
           newTracks.push({
             filePath: file,
             title:
@@ -681,7 +717,8 @@ app.whenReady().then(async () => {
             sampleRate: format.sampleRate,
             bitsPerSample: format.bitsPerSample,
             lossless: format.lossless,
-            container: format.container
+            container: format.container,
+            addedAt
           })
         } catch (err) {
           console.warn(`Could not parse metadata for: ${file}`, err)
