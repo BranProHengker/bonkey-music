@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-1.2.5-FF4E2E?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.0.0-0A84FF?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/electron-v39-1a1a1f?style=flat-square&labelColor=0d0d0f" alt="Electron" />
 </p>
@@ -42,8 +42,18 @@ Choose the right installer for your operating system:
 - **Resume Playback** — Automatically remembers your last played track and exact playback position on app restart.
 - **Volume Persistence** — Volume and mute settings are saved between sessions.
 
+### 🎤 Synced Lyrics Engine (v2.0 Overhaul)
+- **60fps GPU Compositor** — Hardware-accelerated CSS `translate3d` scroller eliminates Chromium rasterization jank and layout reflows.
+- **Dual-Line Bilingual Lyrics** — Kanji/Main lyric lines paired with Romaji/Translation sub-text, animated with subtle kinetic micro-floats and 30ms staggered reveals.
+- **Karaoke Lead-Time Offset** — Predictive line activation (~220ms ahead of vocals) so you can read comfortably right before singing.
+- **Progressive Depth of Field** — Multi-tier optical depth (active line at 0px blur, with calibrated 0.75px, 1.8px, and 3.2px blur tiers).
+- **Full Lyrics Mode** — One-click toggle button to hide the album art column and center lyrics across the screen, persisted in `localStorage`.
+- **Deep Atmospheric Aura** — 50px backdrop blur and radial ambient illumination from the album cover art without UI bleed-through.
+
 ### 📚 Library Management
 - **Folder Scanning** — Point Bonkey Music to your local music folder and it will automatically scan, index, and parse all supported audio files with full metadata extraction (title, artist, album, genre, year, track number, cover art).
+- **Latest Added Category** — Dedicated library filter tab displaying recently added tracks sorted chronologically, complete with a single-click "Play All" button.
+- **Open File Location** — Reveal any song file in your OS file manager (Thunar, Dolphin, Nautilus, Windows Explorer, macOS Finder) directly from track context menus, with native Freedesktop D-Bus `FileManager1` and Hyprland/Wayland compatibility.
 - **Individual File Import** — Import specific audio files without adding an entire folder.
 - **Album Grouping** — Tracks are automatically organized into albums with cover art, artist info, and track listings.
 - **Playlist Creation** — Create custom playlists and manage track assignments.
@@ -56,10 +66,10 @@ Choose the right installer for your operating system:
 - **Dynamic Track Details** — Shows the song name, artist name, and a real-time progress bar/duration synced with the playback time.
 
 ### 🔀 Play Queue
-- **Queue Panel** — Dedicated side panel showing the current playback queue, toggled with `Ctrl + Q`.
-- **Add to Queue** — Add any track to the queue from the track list using the `+` button.
-- **Shuffle Queue** — Randomize the order of remaining tracks in the queue.
-- **Clear Queue** — Instantly clear the entire playback queue.
+- **Simultaneous Queue Drawer** — Floating queue drawer with studio glass backdrop (`z-index: 60`) that slides in smoothly even while the full-screen lyrics overlay is open.
+- **Auto-Hide Cover on Queue** — Automatically collapses the album cover art when the queue is opened in lyrics view, giving ample space to both lyrics and queue side-by-side.
+- **Add to Queue** — Add any track to the queue from the track list using the `+` button or context menu.
+- **Shuffle & Clear** — Randomize or empty the playback queue with dedicated header controls.
 - **Search & Add** — Search your library directly from within the queue panel and add tracks on the fly.
 
 ### 🔁 Playback Modes
@@ -68,11 +78,6 @@ Choose the right installer for your operating system:
 - **Repeat All** — Loop the entire queue continuously.
 - **Repeat One** — Loop the current track indefinitely.
 
-### 🎤 Synced Lyrics
-- **Automatic Loading** — Automatically detects `.lrc` or `.txt` files placed in the same folder as your audio files.
-- **Synced Overlay** — Beautiful Apple Music-style blurred background lyrics overlay that syncs with the current playback time.
-- **Interactive** — Click on any lyric line to instantly seek to that part of the song.
-
 ### 🧭 Navigation
 - **Navigation History** — Browser-style back/forward navigation through your views.
 - **Mouse Thumb Buttons** — Use mouse thumb buttons (Button 4 / Button 5) for back/forward navigation.
@@ -80,10 +85,9 @@ Choose the right installer for your operating system:
 - **Bento Dashboard** — Beautiful card-based overview of your library with stats, album grid, and quick actions.
 
 ### 🎨 Design
-- **Premium Dark Theme** — Charcoal matte & Electric Orange color scheme with obsidian surfaces.
+- **Pure Studio Monochrome & Matte Silver** — Clean, anti-AI-slop obsidian dark interface with metallic silver accents and zero eye-straining neons.
 - **Asymmetric Player Bar** — Four-section horizontal layout: playback controls, track info with circular cover art, inline progress bar, and volume/utility controls.
 - **Audio Metadata Display** — Shows bitrate, sample rate, and format badge directly in the player bar.
-- **Smooth Animations** — Micro-animations on hover, transitions, and interactive elements throughout the UI.
 
 ---
 
@@ -102,6 +106,7 @@ Choose the right installer for your operating system:
 | Toggle Repeat (Loop) | `Ctrl + L` |
 | Toggle Play Queue | `Ctrl + Q` |
 | Focus Search Bar | `Ctrl + F` |
+| Dismiss Lyrics / Close Queue | `Esc` |
 | Navigate Back | Mouse Thumb 1 (Back) |
 | Navigate Forward | Mouse Thumb 2 (Forward) |
 
@@ -149,6 +154,7 @@ music-app/
 │           │   ├── main.css         # Global styles & design tokens
 │           │   └── iconapp.png      # App icon
 │           ├── components/
+│           │   ├── LyricsView.tsx    # Synced 60fps lyrics overlay & karaoke view
 │           │   ├── PlayerBar.tsx     # Bottom player controls
 │           │   ├── PlaylistGrid.tsx  # Bento dashboard grid
 │           │   ├── QueuePanel.tsx    # Play queue side panel
