@@ -12,6 +12,9 @@ export interface OnlineTrack {
   coverArt: string | null
   releaseYear: number | null
   previewUrl: string | null
+  source?: 'deezer' | 'qobuz' | 'itunes'
+  qualityLabel?: string
+  hires?: boolean
 }
 
 export interface LrcSearchResult {
@@ -223,61 +226,122 @@ export function registerStudioIPC(): void {
     return wins.length > 0 ? wins[0] : null
   }
 
-  // ─── 1. Search Online Tracks (iTunes & Deezer) ─────────────────────
-  ipcMain.handle('studio:search-tracks', async (_event, query: string): Promise<OnlineTrack[]> => {
-    if (!query || query.trim().length === 0) return []
-    const trimmed = query.trim()
-
+  // Helper: Search Deezer catalog
+  const searchDeezer = async (query: string): Promise<OnlineTrack[]> => {
     try {
-      // Primary: iTunes Search API (High-res 1400x1400 artwork)
-      const itunesUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(trimmed)}&media=music&entity=song&limit=25`
-      const res = await fetch(itunesUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (BonkeyMusic/2.0)' }
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        if (data.results && data.results.length > 0) {
-          return data.results.map((item: any) => ({
-            id: `itunes_${item.trackId}`,
-            title: item.trackName || 'Unknown Title',
-            artist: item.artistName || 'Unknown Artist',
-            album: item.collectionName || '',
-            duration: Math.round((item.trackTimeMillis || 0) / 1000),
-            coverArt: item.artworkUrl100
-              ? item.artworkUrl100.replace('100x100bb.jpg', '1000x1000bb.jpg')
-              : null,
-            releaseYear: item.releaseDate ? new Date(item.releaseDate).getFullYear() : null,
-            previewUrl: item.previewUrl || null
-          }))
+      const trackMatch = query.match(/deezer\.com\/(?:[a-z]{2}\/)?track\/(\d+)/i)
+      if (trackMatch) {
+        const trackId = trackMatch[1]
+        const res = await fetch(`https://api.deezer.com/track/${trackId}`)
+        if (res.ok) {
+          const item = await res.json()
+          if (item && item.id) {
+            return [
+              {
+                id: `deezer_${item.id}`,
+                title: item.title || 'Unknown Title',
+                artist: item.artist?.name || 'Unknown Artist',
+                album: item.album?.title || '',
+                duration: item.duration || 0,
+                coverArt: item.album?.cover_xl || item.album?.cover_big || null,
+                releaseYear: item.release_date ? new Date(item.release_date).getFullYear() : null,
+                previewUrl: item.preview || null,
+                source: 'deezer',
+                qualityLabel: 'Deezer Lossless / 320k',
+                hires: false
+              }
+            ]
+          }
         }
       }
 
-      // Fallback: Deezer API
-      const deezerUrl = `https://api.deezer.com/search?q=${encodeURIComponent(trimmed)}&limit=25`
-      const dRes = await fetch(deezerUrl)
-      if (dRes.ok) {
-        const dData = await dRes.json()
-        if (dData.data && dData.data.length > 0) {
+      const deezerUrl = `https://api.deezer.com/search?q=${encodeURIComponent(query)}&limit=30`
+      const res = await fetch(deezerUrl, {
+        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) BonkeyMusic/2.0' }
+      })
+      if (res.ok) {
+        const dData = await res.json()
+        if (dData.data && Array.isArray(dData.data)) {
           return dData.data.map((item: any) => ({
             id: `deezer_${item.id}`,
             title: item.title || 'Unknown Title',
             artist: item.artist?.name || 'Unknown Artist',
             album: item.album?.title || '',
             duration: item.duration || 0,
-            coverArt: item.album?.cover_xl || item.album?.cover_big || null,
+            coverArt: item.album?.cover_xl || item.album?.cover_big || item.album?.cover_medium || null,
             releaseYear: null,
-            previewUrl: item.preview || null
+            previewUrl: item.preview || null,
+            source: 'deezer',
+            qualityLabel: 'Deezer Lossless / 320k',
+            hires: false
           }))
         }
       }
-
       return []
     } catch (err) {
-      console.error('[Studio IPC] Error searching online tracks:', err)
+      console.error('[Studio IPC] Deezer search error:', err)
       return []
     }
-  })
+  }
+
+  // Helper: Search Qobuz Hi-Res catalog
+  const searchQobuz = async (query: string): Promise<OnlineTrack[]> => {
+    try {
+      const url = `https://flacdownloader.com/api/qobuz/search?q=${encodeURIComponent(query)}&offset=0`
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+          'Referer': 'https://flacdownloader.com/en/qobuz'
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const tracks = data.tracks || []
+        if (Array.isArray(tracks) && tracks.length > 0) {
+          return tracks.map((item: any) => {
+            const isHires = Boolean(item.hires || (item.samplingRate && item.samplingRate > 48) || (item.bitDepth && item.bitDepth > 16))
+            const rate = item.samplingRate ? `${item.samplingRate} kHz` : '44.1 kHz'
+            const depth = item.bitDepth ? `${item.bitDepth}-bit` : '16-bit'
+            return {
+              id: `qobuz_${item.id}`,
+              title: item.title || 'Unknown Title',
+              artist: item.artist || item.albumArtist || 'Unknown Artist',
+              album: item.album || '',
+              duration: Math.round((item.durationMs || 0) / 1000),
+              coverArt: item.cover || null,
+              releaseYear: item.date ? new Date(item.date).getFullYear() : null,
+              previewUrl: item.url || null,
+              source: 'qobuz' as const,
+              qualityLabel: isHires ? `Qobuz Hi-Res ${depth} / ${rate}` : `Qobuz CD ${depth} / ${rate}`,
+              hires: isHires
+            }
+          })
+        }
+      }
+    } catch (err) {
+      console.error('[Studio IPC] Qobuz search error:', err)
+    }
+    return []
+  }
+
+  // ─── 1. Search Online Tracks (Deezer & Qobuz) ──────────────────────
+  ipcMain.handle(
+    'studio:search-tracks',
+    async (
+      _event,
+      query: string,
+      source: 'deezer' | 'qobuz' = 'deezer'
+    ): Promise<OnlineTrack[]> => {
+      if (!query || query.trim().length === 0) return []
+      const trimmed = query.trim()
+
+      if (source === 'qobuz') {
+        return await searchQobuz(trimmed)
+      } else {
+        return await searchDeezer(trimmed)
+      }
+    }
+  )
 
   // ─── 2. Search Synced Lyrics (LRCLIB) ──────────────────────────────
   ipcMain.handle('studio:search-lrc', async (_event, query: string): Promise<LrcSearchResult[]> => {
@@ -592,7 +656,7 @@ RULES:
   })
 
   // ─── 6. Real Lossless Inspector (Audio Frequency & Format Analysis) ─
-  ipcMain.handle('studio:inspect-lossless', async (_event, filePath: string): Promise<LosslessInspectionResult | null> => {
+  async function inspectSingleFile(filePath: string): Promise<LosslessInspectionResult | null> {
     try {
       if (!existsSync(filePath)) return null
       const { parseFile } = await import('music-metadata')
@@ -678,9 +742,24 @@ RULES:
       console.error('[Studio IPC] Error inspecting file:', err)
       return null
     }
+  }
+
+  ipcMain.handle('studio:inspect-lossless', async (_event, filePath: string): Promise<LosslessInspectionResult | null> => {
+    return await inspectSingleFile(filePath)
   })
 
-  // ─── 7. File Dialog for Inspector ──────────────────────────────────
+  // ─── 7. Batch Lossless Inspection for Multiple Files ───────────────
+  ipcMain.handle('studio:inspect-multiple', async (_event, filePaths: string[]): Promise<LosslessInspectionResult[]> => {
+    if (!Array.isArray(filePaths) || filePaths.length === 0) return []
+    const results: LosslessInspectionResult[] = []
+    for (const fp of filePaths) {
+      const res = await inspectSingleFile(fp)
+      if (res) results.push(res)
+    }
+    return results
+  })
+
+  // ─── 8. File Dialogs for Inspector (Single, Multiple & Folder) ──────
   ipcMain.handle('studio:select-file', async () => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile'],
@@ -691,5 +770,47 @@ RULES:
     })
     if (result.canceled || result.filePaths.length === 0) return null
     return result.filePaths[0]
+  })
+
+  ipcMain.handle('studio:select-multiple-files', async (): Promise<string[]> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        { name: 'Audio Files', extensions: ['flac', 'wav', 'mp3', 'm4a', 'ogg', 'aac', 'alac', 'wma'] }
+      ],
+      title: 'Select Multiple Audio Files to Inspect'
+    })
+    if (result.canceled || result.filePaths.length === 0) return []
+    return result.filePaths
+  })
+
+  ipcMain.handle('studio:select-folder-to-inspect', async (): Promise<string[]> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory'],
+      title: 'Select Folder with Audio Files to Batch Inspect'
+    })
+    if (result.canceled || result.filePaths.length === 0) return []
+    const folderPath = result.filePaths[0]
+    try {
+      const { readdir } = await import('fs/promises')
+      const { join } = await import('path')
+      const { statSync } = await import('fs')
+      const relativePaths = await readdir(folderPath, { recursive: true })
+      const audioExtensions = ['.flac', '.wav', '.mp3', '.m4a', '.ogg', '.aac', '.alac', '.wma']
+      const files: string[] = []
+      for (const p of relativePaths) {
+        const abs = join(folderPath, p)
+        try {
+          const st = statSync(abs)
+          if (st.isFile() && audioExtensions.some((ext) => p.toLowerCase().endsWith(ext))) {
+            files.push(abs)
+          }
+        } catch {}
+      }
+      return files
+    } catch (err) {
+      console.error('[Studio IPC] Error reading directory files:', err)
+      return []
+    }
   })
 }

@@ -14,8 +14,13 @@ import {
   Info
 } from '@phosphor-icons/react'
 import type { OnlineTrack, DownloadProgress } from '../../../../preload/index.d'
+import type { TrackMeta } from '../../hooks/useAudioEngine'
 
 interface FlacDownloaderProps {
+  currentTrack?: TrackMeta | null
+  isPlaying?: boolean
+  togglePlay?: () => void
+  onPlayTrack?: (track: TrackMeta) => void
   onSelectForLrcStudio?: (query: string) => void
   onSelectForInspector?: (filePath: string) => void
   onTrackImported?: (trackPath: string) => void
@@ -30,11 +35,16 @@ interface DownloadStatus {
 }
 
 export default function FlacDownloader({
+  currentTrack,
+  isPlaying,
+  togglePlay,
+  onPlayTrack,
   onSelectForLrcStudio,
   onSelectForInspector,
   onTrackImported
 }: FlacDownloaderProps) {
   const [query, setQuery] = useState('')
+  const [searchSource, setSearchSource] = useState<'deezer' | 'qobuz'>('deezer')
   const [isSearching, setIsSearching] = useState(false)
   const [tracks, setTracks] = useState<OnlineTrack[]>([])
   const [hasSearched, setHasSearched] = useState(false)
@@ -50,16 +60,6 @@ export default function FlacDownloader({
   const [customCover, setCustomCover] = useState('')
 
   const previewAudioRef = useRef<HTMLAudioElement | null>(null)
-
-  // Quick query recommendation chips
-  const quickPills = [
-    'YOASOBI - Idol',
-    'Yorushika - Replicant',
-    'Radiohead - Creep',
-    'Fujii Kaze - Shinunoga E-Wa',
-    'Queen - Bohemian Rhapsody',
-    'Ado - Show'
-  ]
 
   // Listen for download progress updates from backend IPC
   useEffect(() => {
@@ -87,9 +87,10 @@ export default function FlacDownloader({
     }
   }, [])
 
-  const handleSearch = async (searchTerm?: string) => {
+  const handleSearch = async (searchTerm?: string, sourceOverride?: 'deezer' | 'qobuz') => {
     const text = (searchTerm !== undefined ? searchTerm : query).trim()
     if (!text) return
+    const src = sourceOverride || searchSource
 
     setIsSearching(true)
     setHasSearched(true)
@@ -99,13 +100,47 @@ export default function FlacDownloader({
     }
 
     try {
-      const results = await window.api.studio.searchTracks(text)
-      setTracks(results)
+      const results = await window.api.studio.searchTracks(text, src)
+      setTracks(results || [])
     } catch (err) {
       console.error('Failed to search tracks:', err)
       setTracks([])
     } finally {
       setIsSearching(false)
+    }
+  }
+
+  const handleSourceChange = (newSource: 'deezer' | 'qobuz') => {
+    setSearchSource(newSource)
+    if (query.trim()) {
+      handleSearch(query, newSource)
+    }
+  }
+
+  const handlePlayTrack = (track: OnlineTrack) => {
+    if (!track.previewUrl) return
+
+    if (onPlayTrack) {
+      if (currentTrack?.filePath === track.previewUrl) {
+        togglePlay?.()
+        return
+      }
+      onPlayTrack({
+        filePath: track.previewUrl,
+        title: track.title,
+        artist: track.artist,
+        album: track.album || 'Online Preview',
+        duration: track.duration,
+        trackNumber: null,
+        year: track.releaseYear,
+        genre: null,
+        coverArt: track.coverArt,
+        lossless: false,
+        container: 'mp3'
+      })
+      setPreviewTrackId(track.id)
+    } else {
+      togglePreview(track)
     }
   }
 
@@ -214,6 +249,12 @@ export default function FlacDownloader({
     return `${m}:${s.toString().padStart(2, '0')}`
   }
 
+  const getSearchPlaceholder = (): string => {
+    return searchSource === 'qobuz'
+      ? 'Search Qobuz catalog for Studio Master 24-bit Hi-Res & 16-bit FLAC (e.g. Daft Punk)...'
+      : 'Search Deezer catalog for 16-bit FLAC / 320kbps tracks (e.g. YOASOBI)...'
+  }
+
   return (
     <div className="studio-tab-content" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Search Header Banner */}
@@ -225,31 +266,49 @@ export default function FlacDownloader({
           padding: '24px'
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-          <div>
-            <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <DownloadSimple size={22} weight="bold" />
-              <span>Lossless & High-Res Audio Downloader</span>
-            </h2>
-            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
-              Search across global catalogs for high-resolution metadata, official album art, and auto-paired synchronized lyrics.
-            </p>
+        <div style={{ marginBottom: '18px' }}>
+          <h2 style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <DownloadSimple size={22} weight="bold" />
+            <span>Lossless & High-Res Downloader</span>
+          </h2>
+          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
+            Search Deezer and Qobuz for lossless tracks, official album art, and auto-paired lyrics.
+          </p>
+        </div>
+
+        {/* Catalog Source Selector & Direct URL Toggle */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '10px' }}>
+          <div className="studio-segmented">
+            {[
+              { id: 'deezer', label: 'Deezer FLAC' },
+              { id: 'qobuz', label: 'Qobuz Hi-Res' }
+            ].map((src) => {
+              const isActive = searchSource === src.id
+              return (
+                <button
+                  key={src.id}
+                  type="button"
+                  onClick={() => handleSourceChange(src.id as 'deezer' | 'qobuz')}
+                  className={`studio-segmented-pill ${isActive ? 'active' : ''}`}
+                >
+                  <span>{src.label}</span>
+                </button>
+              )
+            })}
           </div>
 
           <button
-            className="btn-control"
+            type="button"
+            className="studio-btn-secondary"
             onClick={() => setShowCustomUrlDrawer((prev) => !prev)}
             style={{
-              padding: '8px 14px',
+              padding: '5px 12px',
               fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px',
-              border: showCustomUrlDrawer ? '1px solid var(--accent)' : '1px solid rgba(255,255,255,0.1)'
+              borderColor: showCustomUrlDrawer ? 'var(--accent)' : undefined
             }}
           >
-            <Link size={16} weight="light" />
-            <span>Direct Audio URL</span>
+            <Link size={15} />
+            <span>Direct Stream URL</span>
           </button>
         </div>
 
@@ -257,9 +316,9 @@ export default function FlacDownloader({
         {showCustomUrlDrawer && (
           <div
             style={{
-              marginBottom: '20px',
+              marginBottom: '18px',
               padding: '16px',
-              background: 'rgba(0, 0, 0, 0.3)',
+              background: 'rgba(0, 0, 0, 0.35)',
               border: '1px solid rgba(255, 255, 255, 0.08)',
               borderRadius: '8px',
               display: 'flex',
@@ -311,17 +370,15 @@ export default function FlacDownloader({
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
-                className="btn-control"
+                className="studio-btn-secondary"
                 onClick={() => setShowCustomUrlDrawer(false)}
-                style={{ padding: '6px 12px', fontSize: '12px' }}
               >
                 Cancel
               </button>
               <button
-                className="btn-spotlight-primary"
+                className="studio-btn-primary"
                 onClick={handleCustomDownload}
                 disabled={!customUrl.trim() || !customTitle.trim()}
-                style={{ padding: '6px 16px', fontSize: '12px', borderRadius: '6px' }}
               >
                 Download & Embed Tags
               </button>
@@ -331,60 +388,34 @@ export default function FlacDownloader({
 
         {/* Studio Online Search Bar */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="search-input-wrapper" style={{ flex: 1, height: '44px' }}>
+          <div className="search-input-wrapper" style={{ flex: 1, height: '40px' }}>
             <MagnifyingGlass size={18} weight="light" />
             <input
               type="text"
               className="search-input"
-              placeholder="Search online catalog by song title or artist (e.g. YOASOBI - Idol)..."
+              placeholder={getSearchPlaceholder()}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSearch()
               }}
-              style={{ fontSize: '14px' }}
             />
           </div>
 
           <button
-            className="btn-spotlight-primary"
+            className="studio-btn-primary"
             onClick={() => handleSearch()}
             disabled={isSearching || !query.trim()}
             style={{
-              height: '44px',
+              height: '40px',
               padding: '0 20px',
               borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              fontWeight: 600
+              fontSize: '13px'
             }}
           >
             {isSearching ? <ArrowClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} weight="bold" />}
             <span>Search</span>
           </button>
-        </div>
-
-        {/* Suggestion Chips */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.05em', fontFamily: 'var(--font-mono)' }}>
-            Quick Search:
-          </span>
-          {quickPills.map((pill) => (
-            <button
-              key={pill}
-              type="button"
-              className="filter-pill"
-              onClick={() => {
-                setQuery(pill)
-                handleSearch(pill)
-              }}
-              style={{ fontSize: '11px', padding: '4px 10px', background: 'rgba(255,255,255,0.03)' }}
-            >
-              {pill}
-            </button>
-          ))}
         </div>
       </div>
 
@@ -428,7 +459,9 @@ export default function FlacDownloader({
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {tracks.map((track) => {
               const status = downloadStatuses[track.id] || { state: 'idle', percent: 0 }
-              const isPlayingPreview = previewTrackId === track.id
+              const isPlayingThis =
+                (currentTrack?.filePath === track.previewUrl && isPlaying) ||
+                (previewTrackId === track.id && previewAudioRef.current && !previewAudioRef.current.paused)
 
               return (
                 <div
@@ -474,34 +507,55 @@ export default function FlacDownloader({
                       {track.previewUrl && (
                         <button
                           type="button"
-                          onClick={() => togglePreview(track)}
-                          title={isPlayingPreview ? 'Pause 30s preview' : 'Play 30s preview'}
+                          onClick={() => handlePlayTrack(track)}
+                          title={isPlayingThis ? 'Pause preview' : 'Play preview'}
                           style={{
                             position: 'absolute',
                             inset: 0,
-                            background: isPlayingPreview ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.3)',
+                            background: isPlayingThis ? 'rgba(0,0,0,0.65)' : 'rgba(0,0,0,0.3)',
                             border: 'none',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
                             color: '#ffffff',
                             cursor: 'pointer',
-                            opacity: isPlayingPreview ? 1 : 0.8
+                            opacity: isPlayingThis ? 1 : 0.85
                           }}
                         >
-                          {isPlayingPreview ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}
+                          {isPlayingThis ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}
                         </button>
                       )}
                     </div>
 
-                    <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div
+                      style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px', cursor: track.previewUrl ? 'pointer' : 'default' }}
+                      onClick={() => track.previewUrl && handlePlayTrack(track)}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                         <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                           {track.title}
                         </span>
                         {track.releaseYear && (
                           <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>
                             {track.releaseYear}
+                          </span>
+                        )}
+                        {track.source && (
+                          <span
+                            className={`studio-tag ${
+                              track.source === 'qobuz'
+                                ? 'studio-tag-qobuz'
+                                : track.source === 'deezer'
+                                  ? 'studio-tag-deezer'
+                                  : 'studio-tag-neutral'
+                            }`}
+                          >
+                            {track.source === 'qobuz' ? (track.hires ? 'QOBUZ HI-RES' : 'QOBUZ') : track.source.toUpperCase()}
+                          </span>
+                        )}
+                        {track.qualityLabel && !track.hires && (
+                          <span className="studio-tag studio-tag-neutral">
+                            {track.qualityLabel}
                           </span>
                         )}
                       </div>
@@ -528,18 +582,10 @@ export default function FlacDownloader({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
                     {status.state === 'idle' && (
                       <button
-                        className="btn-spotlight-primary"
+                        className="studio-btn-primary"
                         onClick={() => handleDownload(track)}
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '7px 14px',
-                          fontSize: '12px',
-                          borderRadius: '6px'
-                        }}
                       >
-                        <DownloadSimple size={16} weight="bold" />
+                        <DownloadSimple size={15} weight="bold" />
                         <span>Download</span>
                       </button>
                     )}
@@ -563,43 +609,38 @@ export default function FlacDownloader({
                     )}
 
                     {status.state === 'completed' && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#10b981', fontWeight: 500 }}>
-                          <CheckCircle size={16} weight="fill" />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#10b981', fontWeight: 600 }}>
+                          <CheckCircle size={15} weight="fill" />
                           <span>Saved</span>
-                        </div>
+                        </span>
 
                         {status.filePath && (
-                          <>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             <button
-                              className="btn-control"
+                              className="studio-btn-icon"
                               title="Reveal audio file in folder"
                               onClick={() => window.api.openFileLocation(status.filePath!)}
-                              style={{ padding: '6px 10px', fontSize: '11px' }}
                             >
-                              <FolderOpen size={14} />
+                              <FolderOpen size={15} />
                             </button>
 
                             <button
-                              className="btn-control"
-                              title="Inspect frequency spectrum & quality"
+                              className="studio-btn-icon"
+                              title="Inspect audio spectrum & quality"
                               onClick={() => onSelectForInspector?.(status.filePath!)}
-                              style={{ padding: '6px 10px', fontSize: '11px' }}
                             >
-                              <Sliders size={14} />
-                              <span style={{ marginLeft: '4px' }}>Inspect</span>
+                              <Sliders size={15} />
                             </button>
 
                             <button
-                              className="btn-control"
+                              className="studio-btn-icon"
                               title="Open in Synced Lyrics Studio"
                               onClick={() => onSelectForLrcStudio?.(`${track.artist} - ${track.title}`)}
-                              style={{ padding: '6px 10px', fontSize: '11px' }}
                             >
-                              <Sparkle size={14} />
-                              <span style={{ marginLeft: '4px' }}>LRC</span>
+                              <Sparkle size={15} />
                             </button>
-                          </>
+                          </div>
                         )}
                       </div>
                     )}
@@ -608,9 +649,9 @@ export default function FlacDownloader({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ fontSize: '11px', color: '#ef4444' }}>{status.error || 'Failed'}</span>
                         <button
-                          className="btn-control"
+                          className="studio-btn-secondary"
                           onClick={() => handleDownload(track)}
-                          style={{ padding: '4px 8px', fontSize: '11px' }}
+                          style={{ padding: '4px 10px', fontSize: '11px' }}
                         >
                           Retry
                         </button>

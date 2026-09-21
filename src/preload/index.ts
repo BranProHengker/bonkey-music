@@ -26,8 +26,8 @@ const musicAPI = {
   openFileLocation: (filePath: string): Promise<boolean> =>
     ipcRenderer.invoke('open-file-location', filePath),
   studio: {
-    searchTracks: (query: string): Promise<any[]> =>
-      ipcRenderer.invoke('studio:search-tracks', query),
+    searchTracks: (query: string, source?: string): Promise<any[]> =>
+      ipcRenderer.invoke('studio:search-tracks', query, source),
     searchLrc: (query: string): Promise<any[]> =>
       ipcRenderer.invoke('studio:search-lrc', query),
     romajiTransliterate: (lyrics: string): Promise<any> =>
@@ -38,8 +38,14 @@ const musicAPI = {
       ipcRenderer.invoke('studio:download-track', track, customDir),
     inspectLossless: (filePath: string): Promise<any> =>
       ipcRenderer.invoke('studio:inspect-lossless', filePath),
+    inspectMultiple: (filePaths: string[]): Promise<any[]> =>
+      ipcRenderer.invoke('studio:inspect-multiple', filePaths),
     selectFile: (): Promise<string | null> =>
       ipcRenderer.invoke('studio:select-file'),
+    selectMultipleFiles: (): Promise<string[]> =>
+      ipcRenderer.invoke('studio:select-multiple-files'),
+    selectFolderToInspect: (): Promise<string[]> =>
+      ipcRenderer.invoke('studio:select-folder-to-inspect'),
     onDownloadProgress: (callback: (progress: any) => void): (() => void) => {
       const handler = (_event: any, progress: any) => callback(progress)
       ipcRenderer.on('studio:download-progress', handler)

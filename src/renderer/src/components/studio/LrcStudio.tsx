@@ -342,17 +342,15 @@ export default function LrcStudio({
 
           {currentTrack && (
             <button
-              className="btn-control"
+              className="studio-btn-secondary"
               onClick={handleLoadCurrentTrack}
               style={{
-                padding: '8px 14px',
+                padding: '0 12px',
                 fontSize: '12px',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '6px'
+                height: '34px'
               }}
             >
-              <Disc size={16} weight="light" />
+              <Disc size={16} />
               <span>Load Playing: {currentTrack.title}</span>
             </button>
           )}
@@ -360,7 +358,7 @@ export default function LrcStudio({
 
         {/* LRCLIB Search Input Bar */}
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="search-input-wrapper" style={{ flex: 1, height: '44px' }}>
+          <div className="search-input-wrapper" style={{ flex: 1, height: '40px' }}>
             <MagnifyingGlass size={18} weight="light" />
             <input
               type="text"
@@ -371,23 +369,19 @@ export default function LrcStudio({
               onKeyDown={(e) => {
                 if (e.key === 'Enter') handleSearch()
               }}
-              style={{ fontSize: '14px' }}
+              style={{ fontSize: '13px' }}
             />
           </div>
 
           <button
-            className="btn-spotlight-primary"
+            className="studio-btn-primary"
             onClick={() => handleSearch()}
             disabled={isSearching || !searchQuery.trim()}
             style={{
-              height: '44px',
-              padding: '0 20px',
+              height: '40px',
+              padding: '0 18px',
               borderRadius: '8px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              fontSize: '13px',
-              fontWeight: 600
+              fontSize: '13px'
             }}
           >
             {isSearching ? <ArrowClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} weight="bold" />}
@@ -492,20 +486,18 @@ export default function LrcStudio({
               gap: '12px'
             }}
           >
-            {/* Left: Romaji Generator & View Mode */}
+            {/* Left: Romaji Generator, View Mode, and Offset Tuner */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               {isJapaneseSong && !isRomajiConverted && (
                 <button
-                  className="btn-spotlight-primary"
+                  className="studio-btn-secondary"
                   onClick={handleGenerateRomaji}
                   disabled={isConvertingRomaji}
                   style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '6px',
-                    padding: '7px 14px',
+                    padding: '0 12px',
                     fontSize: '12px',
-                    borderRadius: '6px'
+                    height: '28px',
+                    color: 'var(--accent)'
                   }}
                 >
                   {isConvertingRomaji ? (
@@ -526,63 +518,66 @@ export default function LrcStudio({
                     fontSize: '12px',
                     color: '#10b981',
                     fontWeight: 600,
-                    padding: '6px 10px',
+                    padding: '4px 10px',
                     background: 'rgba(16, 185, 129, 0.1)',
                     borderRadius: '6px'
                   }}
                 >
-                  <CheckCircle size={16} weight="fill" />
+                  <CheckCircle size={15} weight="fill" />
                   <span>Romaji Active</span>
                 </div>
               )}
 
               {/* View Switcher: Karaoke vs Raw */}
-              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="studio-segmented" style={{ padding: '2px' }}>
                 <button
-                  className={`filter-pill ${activeView === 'karaoke' ? 'active' : ''}`}
+                  className={`studio-segmented-pill ${activeView === 'karaoke' ? 'active' : ''}`}
                   onClick={() => setActiveView('karaoke')}
-                  style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ fontSize: '11px', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Eye size={14} />
+                  <Eye size={13} />
                   <span>Karaoke Stage</span>
                 </button>
                 <button
-                  className={`filter-pill ${activeView === 'raw' ? 'active' : ''}`}
+                  className={`studio-segmented-pill ${activeView === 'raw' ? 'active' : ''}`}
                   onClick={() => setActiveView('raw')}
-                  style={{ fontSize: '11px', padding: '4px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ fontSize: '11px', padding: '3px 10px', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <Code size={14} />
+                  <Code size={13} />
                   <span>Raw Editor</span>
                 </button>
               </div>
 
               {/* Offset Tuner */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(0,0,0,0.3)', padding: '2px 6px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginRight: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '4px', background: 'rgba(255,255,255,0.03)', padding: '2px 6px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <span style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', marginRight: '2px', fontWeight: 600 }}>
                   OFFSET:
                 </span>
                 <button
-                  className="btn-control"
+                  className="studio-segmented-pill"
                   style={{ padding: '2px 6px', fontSize: '11px' }}
                   onClick={() => setSyncOffset((prev) => Math.round((prev - 0.2) * 10) / 10)}
+                  title="Shift lyrics 0.2s earlier"
                 >
                   -0.2s
                 </button>
-                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', minWidth: '40px', textAlign: 'center', color: syncOffset !== 0 ? 'var(--accent)' : 'var(--text-secondary)' }}>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', minWidth: '42px', textAlign: 'center', color: syncOffset !== 0 ? 'var(--accent)' : 'var(--text-secondary)', fontWeight: 600 }}>
                   {syncOffset > 0 ? `+${syncOffset}s` : `${syncOffset}s`}
                 </span>
                 <button
-                  className="btn-control"
+                  className="studio-segmented-pill"
                   style={{ padding: '2px 6px', fontSize: '11px' }}
                   onClick={() => setSyncOffset((prev) => Math.round((prev + 0.2) * 10) / 10)}
+                  title="Shift lyrics 0.2s later"
                 >
                   +0.2s
                 </button>
                 {syncOffset !== 0 && (
                   <button
-                    className="btn-control"
+                    className="studio-segmented-pill"
                     style={{ padding: '2px 6px', fontSize: '10px', color: 'var(--text-tertiary)' }}
                     onClick={() => setSyncOffset(0)}
+                    title="Reset offset to 0"
                   >
                     Reset
                   </button>
@@ -593,26 +588,26 @@ export default function LrcStudio({
             {/* Right: Output Mode & Actions */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               {/* Output Mode Selector */}
-              <div style={{ display: 'flex', background: 'rgba(0,0,0,0.3)', padding: '2px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <div className="studio-segmented" style={{ padding: '2px' }}>
                 <button
-                  className={`filter-pill ${exportMode === 'dual' ? 'active' : ''}`}
+                  className={`studio-segmented-pill ${exportMode === 'dual' ? 'active' : ''}`}
                   onClick={() => setExportMode('dual')}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  style={{ fontSize: '11px', padding: '3px 9px' }}
                 >
                   Dual-Line
                 </button>
                 <button
-                  className={`filter-pill ${exportMode === 'romaji' ? 'active' : ''}`}
+                  className={`studio-segmented-pill ${exportMode === 'romaji' ? 'active' : ''}`}
                   disabled={!romajiLrc}
                   onClick={() => setExportMode('romaji')}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  style={{ fontSize: '11px', padding: '3px 9px' }}
                 >
                   Romaji
                 </button>
                 <button
-                  className={`filter-pill ${exportMode === 'original' ? 'active' : ''}`}
+                  className={`studio-segmented-pill ${exportMode === 'original' ? 'active' : ''}`}
                   onClick={() => setExportMode('original')}
-                  style={{ fontSize: '11px', padding: '4px 8px' }}
+                  style={{ fontSize: '11px', padding: '3px 9px' }}
                 >
                   Original
                 </button>
@@ -620,41 +615,38 @@ export default function LrcStudio({
 
               {/* Copy */}
               <button
-                className="btn-control"
+                className="studio-btn-secondary"
                 onClick={handleCopy}
-                style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
+                style={{ padding: '0 10px', fontSize: '12px', height: '28px' }}
               >
                 {hasCopied ? <Check size={14} /> : <Copy size={14} />}
                 <span>{hasCopied ? 'Copied' : 'Copy'}</span>
               </button>
 
-              {/* Apply to Current Track (Desktop Special) */}
+              {/* Export File */}
               <button
-                className="btn-spotlight-primary"
+                className="studio-btn-secondary"
+                onClick={handleDownloadFile}
+                style={{ padding: '0 10px', fontSize: '12px', height: '28px' }}
+              >
+                <DownloadSimple size={14} />
+                <span>Save .lrc</span>
+              </button>
+
+              {/* Apply to Current Track (Single Clear Primary CTA) */}
+              <button
+                className="studio-btn-primary"
                 onClick={handleApplyToCurrentSong}
                 disabled={!currentTrack}
                 title={currentTrack ? `Save alongside ${currentTrack.title}` : 'Play a track to apply lyrics'}
                 style={{
-                  padding: '6px 14px',
+                  padding: '0 12px',
                   fontSize: '12px',
-                  borderRadius: '6px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '6px'
+                  height: '28px'
                 }}
               >
                 <FloppyDisk size={14} weight="bold" />
                 <span>Apply to Current Song</span>
-              </button>
-
-              {/* Download File */}
-              <button
-                className="btn-control"
-                onClick={handleDownloadFile}
-                style={{ padding: '6px 12px', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}
-              >
-                <DownloadSimple size={14} />
-                <span>Export .lrc</span>
               </button>
             </div>
           </div>

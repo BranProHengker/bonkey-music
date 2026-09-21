@@ -9,6 +9,9 @@ export interface OnlineTrack {
   coverArt: string | null
   releaseYear: number | null
   previewUrl: string | null
+  source?: 'deezer' | 'qobuz' | 'custom'
+  qualityLabel?: string
+  hires?: boolean
 }
 
 export interface LrcSearchResult {
@@ -61,13 +64,16 @@ export interface DownloadProgress {
 }
 
 export interface StudioAPI {
-  searchTracks: (query: string) => Promise<OnlineTrack[]>
+  searchTracks: (query: string, source?: 'deezer' | 'qobuz') => Promise<OnlineTrack[]>
   searchLrc: (query: string) => Promise<LrcSearchResult[]>
   romajiTransliterate: (lyrics: string) => Promise<RomajiResponse>
   saveLrc: (data: { audioFilePath?: string; title: string; artist: string; lrcContent: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>
   downloadTrack: (track: OnlineTrack, customDir?: string) => Promise<{ success: boolean; filePath?: string; lrcPath?: string; error?: string }>
   inspectLossless: (filePath: string) => Promise<LosslessInspectionResult | null>
+  inspectMultiple: (filePaths: string[]) => Promise<LosslessInspectionResult[]>
   selectFile: () => Promise<string | null>
+  selectMultipleFiles: () => Promise<string[]>
+  selectFolderToInspect: () => Promise<string[]>
   onDownloadProgress: (callback: (progress: DownloadProgress) => void) => () => void
 }
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, memo, forwardRef } from 'react'
-import { MusicNotes, X, SidebarSimple } from '@phosphor-icons/react'
+import { MusicNotes, X, SidebarSimple, CloudArrowDown, ArrowClockwise } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface LyricLine {
@@ -57,6 +57,8 @@ export default function LyricsView({
   onCloseQueue
 }: LyricsViewProps): React.JSX.Element {
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
+  const [isSearchingOnline, setIsSearchingOnline] = useState(false)
+  const [onlineSearchNotice, setOnlineSearchNotice] = useState<string | null>(null)
 
   // Persistent user preference for manual cover visibility
   const [userCoverHidden, setUserCoverHidden] = useState<boolean>(() => {
@@ -100,23 +102,72 @@ export default function LyricsView({
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose, isQueueOpen, onCloseQueue])
 
-  // Fetch lyrics when track changes
+  // Fetch lyrics when track changes (Strictly Offline-First from local files or embedded tags)
   useEffect(() => {
+    let isCancelled = false
+    setOnlineSearchNotice(null)
+
     async function fetchLyrics() {
       if (!currentTrack) {
         setRawLyrics(null)
         return
       }
       try {
-        const lyrics = await window.api.getLyrics(currentTrack.filePath)
-        setRawLyrics(lyrics)
+        const localLyrics = await window.api.getLyrics(currentTrack.filePath)
+        if (!isCancelled) {
+          setRawLyrics(localLyrics)
+        }
       } catch (err) {
         console.warn('Error loading lyrics:', err)
-        setRawLyrics(null)
+        if (!isCancelled) {
+          setRawLyrics(null)
+        }
       }
     }
     fetchLyrics()
+
+    return () => {
+      isCancelled = true
+    }
   }, [currentTrack])
+
+  // On-demand manual online search button (optional, keeps app strictly offline by default)
+  const handleSearchOnlineLyrics = async () => {
+    if (!currentTrack || !currentTrack.title || isSearchingOnline) return
+
+    setIsSearchingOnline(true)
+    setOnlineSearchNotice(null)
+
+    try {
+      const query = `${currentTrack.title} ${currentTrack.artist || ''}`.trim()
+      const searchResults = await window.api.studio.searchLrc(query)
+      if (Array.isArray(searchResults) && searchResults.length > 0) {
+        const best = searchResults.find((r) => r.syncedLyrics) || searchResults[0]
+        const lyricText = best.syncedLyrics || best.plainLyrics || null
+        if (lyricText) {
+          setRawLyrics(lyricText)
+          // If local file, save alongside automatically so it's cached offline
+          if (currentTrack.filePath && !currentTrack.filePath.startsWith('http')) {
+            try {
+              await window.api.studio.saveLrc({
+                audioFilePath: currentTrack.filePath,
+                title: currentTrack.title,
+                artist: currentTrack.artist,
+                lrcContent: lyricText
+              })
+            } catch {}
+          }
+          return
+        }
+      }
+      setOnlineSearchNotice('No lyrics found online on LRCLIB')
+    } catch (err) {
+      console.warn('Failed to search online lyrics:', err)
+      setOnlineSearchNotice('Failed to connect to LRCLIB')
+    } finally {
+      setIsSearchingOnline(false)
+    }
+  }
 
   // Parse raw LRC / TXT lyrics
   const { lines: lyricsList, hasTimestamps } = useMemo(() => {
@@ -384,26 +435,46 @@ export default function LyricsView({
           ref={isSyncedActive ? containerRef : plainContainerRef}
           onWheel={handleWheel}
         >
-          {/* Compact track header when cover is hidden */}
-          {isCoverHidden && currentTrack && (
-            <div className="lyrics-compact-header">
-              <span className="lyrics-compact-title">{currentTrack.title}</span>
-              <span className="lyrics-compact-bullet">•</span>
-              <span className="lyrics-compact-artist">{currentTrack.artist}</span>
-              {(currentTrack.lossless || currentTrack.container) && (
-                <span className="lyrics-compact-chip">
-                  {currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}
-                </span>
-              )}
-            </div>
-          )}
           {lyricsList.length === 0 ? (
             <div className="lyrics-empty-state">
               <MusicNotes size={32} weight="light" style={{ marginBottom: '12px', opacity: 0.4 }} />
               <p>No lyrics found for this track</p>
-              <span className="lyrics-empty-subtitle">
+              <span className="lyrics-empty-subtitle" style={{ marginBottom: '16px' }}>
                 Put a `.lrc` or `.txt` file with the same name next to the audio file to load lyrics automatically.
               </span>
+
+              {/* Manual On-Demand Online Search Button */}
+              {window.api?.studio && currentTrack && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <button
+                    type="button"
+                    className="studio-btn-secondary"
+                    onClick={handleSearchOnlineLyrics}
+                    disabled={isSearchingOnline}
+                    style={{
+                      padding: '8px 16px',
+                      fontSize: '12.5px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      borderRadius: '8px'
+                    }}
+                  >
+                    {isSearchingOnline ? (
+                      <ArrowClockwise size={15} className="animate-spin" />
+                    ) : (
+                      <CloudArrowDown size={15} weight="bold" />
+                    )}
+                    <span>{isSearchingOnline ? 'Searching LRCLIB...' : 'Search Lyrics Online'}</span>
+                  </button>
+
+                  {onlineSearchNotice && (
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+                      {onlineSearchNotice}
+                    </span>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <>

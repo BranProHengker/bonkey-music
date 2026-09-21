@@ -835,6 +835,10 @@ export default function App(): React.JSX.Element {
             currentTrack={currentTrack}
             currentTime={currentTime}
             seek={seek}
+            isPlaying={isPlaying}
+            togglePlay={togglePlay}
+            onPlayTrack={handlePlayTrack}
+            allTracks={tracks}
             onTrackImported={async () => {
               const lib = await window.api.loadLibrary()
               setTracks(lib as TrackMeta[])

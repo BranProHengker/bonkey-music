@@ -12,16 +12,24 @@ import type { TrackMeta } from '../../hooks/useAudioEngine'
 
 interface StudioHubProps {
   currentTrack?: TrackMeta | null
+  isPlaying?: boolean
+  togglePlay?: () => void
+  onPlayTrack?: (track: TrackMeta) => void
   currentTime?: number
   seek?: (time: number) => void
   onTrackImported?: (trackPath: string) => void
+  allTracks?: TrackMeta[]
 }
 
 export default function StudioHub({
   currentTrack,
+  isPlaying,
+  togglePlay,
+  onPlayTrack,
   currentTime = 0,
   seek,
-  onTrackImported
+  onTrackImported,
+  allTracks = []
 }: StudioHubProps) {
   const [activeTab, setActiveTab] = useState<'downloader' | 'lrc' | 'inspector'>('downloader')
   const [lrcInitialQuery, setLrcInitialQuery] = useState('')
@@ -68,73 +76,38 @@ export default function StudioHub({
           </div>
 
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>
-                Music Studio
-              </h1>
-              <span className="badge-hires" style={{ fontSize: '10px' }}>
-                v2.0 Hub
-              </span>
-            </div>
+            <h1 style={{ fontSize: '20px', fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 4px 0' }}>
+              Music Studio
+            </h1>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              FLAC Downloader, Auto-ID3 Embedder, Lossless Inspector & Synced Lyrics Port
+              Lossless audio downloader, quality inspector, and synchronized lyrics editor.
             </span>
           </div>
         </div>
 
-        {/* Tab Pills */}
-        <div
-          style={{
-            display: 'flex',
-            background: 'rgba(255, 255, 255, 0.03)',
-            padding: '3px',
-            borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.06)',
-            gap: '2px'
-          }}
-        >
+        {/* Tab Switcher */}
+        <div className="studio-segmented">
           <button
-            className={`filter-pill ${activeTab === 'downloader' ? 'active' : ''}`}
+            className={`studio-segmented-pill ${activeTab === 'downloader' ? 'active' : ''}`}
             onClick={() => setActiveTab('downloader')}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
           >
-            <DownloadSimple size={15} weight={activeTab === 'downloader' ? 'bold' : 'light'} />
+            <DownloadSimple size={15} weight={activeTab === 'downloader' ? 'bold' : 'regular'} />
             <span>FLAC Downloader</span>
           </button>
 
           <button
-            className={`filter-pill ${activeTab === 'lrc' ? 'active' : ''}`}
+            className={`studio-segmented-pill ${activeTab === 'lrc' ? 'active' : ''}`}
             onClick={() => setActiveTab('lrc')}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
           >
-            <Sparkle size={15} weight={activeTab === 'lrc' ? 'bold' : 'light'} />
-            <span>LRC Lyrics Studio</span>
+            <Sparkle size={15} weight={activeTab === 'lrc' ? 'bold' : 'regular'} />
+            <span>Lyrics Studio</span>
           </button>
 
           <button
-            className={`filter-pill ${activeTab === 'inspector' ? 'active' : ''}`}
+            className={`studio-segmented-pill ${activeTab === 'inspector' ? 'active' : ''}`}
             onClick={() => setActiveTab('inspector')}
-            style={{
-              padding: '6px 14px',
-              fontSize: '12px',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '6px'
-            }}
           >
-            <Sliders size={15} weight={activeTab === 'inspector' ? 'bold' : 'light'} />
+            <Sliders size={15} weight={activeTab === 'inspector' ? 'bold' : 'regular'} />
             <span>Lossless Inspector</span>
           </button>
         </div>
@@ -143,6 +116,10 @@ export default function StudioHub({
       {/* Tab Panels */}
       {activeTab === 'downloader' && (
         <FlacDownloader
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          togglePlay={togglePlay}
+          onPlayTrack={onPlayTrack}
           onSelectForLrcStudio={handleJumpToLrc}
           onSelectForInspector={handleJumpToInspector}
           onTrackImported={onTrackImported}
@@ -163,6 +140,7 @@ export default function StudioHub({
           currentTrack={currentTrack}
           initialFilePath={inspectorInitialPath}
           onSelectForLrcStudio={handleJumpToLrc}
+          allTracks={allTracks}
         />
       )}
     </div>
