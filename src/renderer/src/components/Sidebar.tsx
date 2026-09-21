@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { House, Heart, Gear, Plus, Disc, MusicNotes, ClockCounterClockwise } from '@phosphor-icons/react'
+import { House, Heart, Gear, Plus, Disc, MusicNotes, ClockCounterClockwise, Equalizer } from '@phosphor-icons/react'
 import iconApp from '../assets/iconapp.png'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
@@ -22,8 +22,8 @@ function formatRelativeTime(timestamp?: number): string {
 }
 
 interface SidebarProps {
-  currentView: 'library' | 'favorites' | 'settings' | 'latest'
-  setCurrentView: (view: 'library' | 'favorites' | 'settings' | 'latest') => void
+  currentView: 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
+  setCurrentView: (view: 'library' | 'favorites' | 'settings' | 'latest' | 'studio') => void
   libraryFolder: string | null
   playlists: string[]
   activePlaylist: string | null
@@ -83,7 +83,7 @@ export default function Sidebar({
     }
   }, [currentView, filter])
 
-  const handleNavClick = (view: 'library' | 'favorites' | 'settings' | 'latest') => {
+  const handleNavClick = (view: 'library' | 'favorites' | 'settings' | 'latest' | 'studio') => {
     setCurrentView(view)
     setActivePlaylist(null)
     setActiveAlbum(null)
@@ -204,6 +204,14 @@ export default function Sidebar({
         >
           <Heart size={20} weight="light" />
           <span>Liked Songs</span>
+        </button>
+
+        <button
+          className={`nav-item ${currentView === 'studio' ? 'active' : ''}`}
+          onClick={() => handleNavClick('studio')}
+        >
+          <Equalizer size={20} weight="light" />
+          <span>Music Studio</span>
         </button>
       </nav>
 

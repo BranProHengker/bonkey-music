@@ -23,6 +23,7 @@ import PlaylistGrid from './components/PlaylistGrid'
 import PlayerBar from './components/PlayerBar'
 import QueuePanel from './components/QueuePanel'
 import LyricsView from './components/LyricsView'
+import StudioHub from './components/studio/StudioHub'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
 
 interface AlbumGroup {
@@ -58,7 +59,7 @@ export default function App(): React.JSX.Element {
   } = useAudioEngine()
 
   // ─── State ──────────────────────────────────────────────────────────
-  const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings' | 'latest'>('library')
+  const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings' | 'latest' | 'studio'>('library')
   const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
@@ -82,7 +83,7 @@ export default function App(): React.JSX.Element {
 
   // ─── Navigation History ──────────────────────────────────────────────
   const [history, setHistory] = useState<Array<{
-    currentView: 'library' | 'favorites' | 'settings' | 'latest'
+    currentView: 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
     activePlaylist: string | null
     activeAlbum: string | null
   }>>([{ currentView: 'library', activePlaylist: null, activeAlbum: null }])
@@ -791,43 +792,55 @@ export default function App(): React.JSX.Element {
 
       {/* Main Panel */}
       <main className="main-content">
-        {/* Search Bar / Action Bar */}
-        <div className="search-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {(activeAlbum || activePlaylist || searchQuery || currentView === 'latest') && (
-            <button
-              className="btn-control"
-              onClick={handleClearFilters}
-              style={{
-                border: '1px solid rgba(255,255,255,0.05)',
-                backgroundColor: 'var(--bg-secondary)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                width: '38px',
-                height: '38px',
-                minWidth: '38px',
-                borderRadius: '50%'
-              }}
-              title="Back"
-            >
-              <ArrowLeft size={16} weight="light" />
-            </button>
-          )}
-          <div className="search-input-wrapper" style={{ flexGrow: 1, maxWidth: '320px' }}>
-            <MagnifyingGlass size={18} weight="light" />
-            <input
-              ref={searchInputRef}
-              type="text"
-              className="search-input"
-              placeholder="Search tracks, artists, albums..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
+        {/* Search Bar / Action Bar (Dedicated to local library, hidden in Music Studio) */}
+        {currentView !== 'studio' && (
+          <div className="search-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {(activeAlbum || activePlaylist || searchQuery || currentView === 'latest') && (
+              <button
+                className="btn-control"
+                onClick={handleClearFilters}
+                style={{
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  backgroundColor: 'var(--bg-secondary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: '38px',
+                  height: '38px',
+                  minWidth: '38px',
+                  borderRadius: '50%'
+                }}
+                title="Back"
+              >
+                <ArrowLeft size={16} weight="light" />
+              </button>
+            )}
+            <div className="search-input-wrapper" style={{ flexGrow: 1, maxWidth: '320px' }}>
+              <MagnifyingGlass size={18} weight="light" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                className="search-input"
+                placeholder="Search tracks, artists, albums..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* View Routing */}
-        {currentView === 'settings' ? (
+        {currentView === 'studio' ? (
+          <StudioHub
+            currentTrack={currentTrack}
+            currentTime={currentTime}
+            seek={seek}
+            onTrackImported={async () => {
+              const lib = await window.api.loadLibrary()
+              setTracks(lib as TrackMeta[])
+            }}
+          />
+        ) : currentView === 'settings' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <h2 className="section-title">Settings</h2>
             

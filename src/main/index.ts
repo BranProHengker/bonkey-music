@@ -16,6 +16,7 @@ import { readFile, writeFile, readdir, copyFile, mkdir } from 'fs/promises'
 import { existsSync, createReadStream, statSync } from 'fs'
 import { electronApp, is } from '@electron-toolkit/utils'
 import DiscordRPC from 'discord-rpc'
+import { registerStudioIPC } from './studio'
 
 // ─── Types ───────────────────────────────────────────────────────────
 export interface TrackMeta {
@@ -843,6 +844,7 @@ app.whenReady().then(async () => {
 
   createWindow()
   createTray()
+  registerStudioIPC()
 
   // Register global media shortcuts for IEM/TWS headset controls and media keyboards
   const registerShortcut = (keys: string[], action: string) => {

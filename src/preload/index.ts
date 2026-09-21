@@ -24,7 +24,30 @@ const musicAPI = {
   selectImage: (): Promise<string | null> =>
     ipcRenderer.invoke('select-image'),
   openFileLocation: (filePath: string): Promise<boolean> =>
-    ipcRenderer.invoke('open-file-location', filePath)
+    ipcRenderer.invoke('open-file-location', filePath),
+  studio: {
+    searchTracks: (query: string): Promise<any[]> =>
+      ipcRenderer.invoke('studio:search-tracks', query),
+    searchLrc: (query: string): Promise<any[]> =>
+      ipcRenderer.invoke('studio:search-lrc', query),
+    romajiTransliterate: (lyrics: string): Promise<any> =>
+      ipcRenderer.invoke('studio:romaji-transliterate', lyrics),
+    saveLrc: (data: { audioFilePath?: string; title: string; artist: string; lrcContent: string }): Promise<any> =>
+      ipcRenderer.invoke('studio:save-lrc', data),
+    downloadTrack: (track: any, customDir?: string): Promise<any> =>
+      ipcRenderer.invoke('studio:download-track', track, customDir),
+    inspectLossless: (filePath: string): Promise<any> =>
+      ipcRenderer.invoke('studio:inspect-lossless', filePath),
+    selectFile: (): Promise<string | null> =>
+      ipcRenderer.invoke('studio:select-file'),
+    onDownloadProgress: (callback: (progress: any) => void): (() => void) => {
+      const handler = (_event: any, progress: any) => callback(progress)
+      ipcRenderer.on('studio:download-progress', handler)
+      return () => {
+        ipcRenderer.removeListener('studio:download-progress', handler)
+      }
+    }
+  }
 }
 
 // Use contextBridge to expose APIs securely
