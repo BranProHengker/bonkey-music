@@ -1,4 +1,4 @@
-name: Build/Release Application
+name: Release Application
 
 on:
   push:
@@ -10,15 +10,30 @@ permissions:
 
 jobs:
   release:
-    runs-on: ${{ matrix.os }}
-
+    permissions:
+      contents: write
     strategy:
+      fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - platform: 'ubuntu-22.04'
+            args: ''
+          - platform: 'windows-latest'
+            args: ''
 
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Dependencies (Ubuntu only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libasound2-dev
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -28,20 +43,26 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
+          cache: 'pnpm'
 
-      - name: Install Dependencies
+      - name: Install Frontend Dependencies
         run: pnpm install
 
-      - name: Build and Release Electron App
+      - name: Build and Release Tauri App
+        uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if [ "$RUNNER_OS" == "Windows" ]; then
-            pnpm run build:win -- --publish always
-          else
-            pnpm run build:linux -- --publish always
-          fi
-        shell: bash
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Bonkey Music ${{ github.ref_name }}'
+          releaseBody: |
+            ## What's Changed
+            - **Performance & Core**: Tauri v2 backend, load library instan (<1ms), fix freeze startup.
+            - **UI/UX**: Outfit font global, fix overlay lirik terpotong player bar.
+            - **Studio**: Fokus ke Lossless Inspector (FFT) & Lyrics/Romaji Studio.
+          releaseDraft: false
+          prerelease: false
+          args: ${{ matrix.args }}
 
 
