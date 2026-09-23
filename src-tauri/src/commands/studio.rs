@@ -162,31 +162,126 @@ pub fn studio_save_lrc(data: Value) -> Result<Value, String> {
     }))
 }
 
+fn contains_japanese(text: &str) -> bool {
+    text.chars().any(|c| {
+        matches!(
+            c,
+            '\u{3040}'..='\u{309F}'  // Hiragana
+            | '\u{30A0}'..='\u{30FF}' // Katakana
+            | '\u{4E00}'..='\u{9FFF}' // CJK Unified Ideographs / Kanji
+            | '\u{3400}'..='\u{4DBF}' // Extension A
+        )
+    })
+}
+
+fn parse_lrc_timestamp_seconds(time_str: &str) -> f64 {
+    let parts: Vec<&str> = time_str.split(':').collect();
+    if parts.len() == 2 {
+        let mins: f64 = parts[0].parse().unwrap_or(0.0);
+        let secs: f64 = parts[1].parse().unwrap_or(0.0);
+        mins * 60.0 + secs
+    } else {
+        0.0
+    }
+}
+
 #[tauri::command]
 pub fn studio_romaji_transliterate(lyrics: String) -> Result<RomajiResponse, String> {
-    // Basic parser for Japanese lines fallback
-    let mut lines = Vec::new();
+    if lyrics.trim().is_empty() {
+        return Ok(RomajiResponse {
+            success: false,
+            is_japanese: Some(false),
+            message: Some("Lyrics are empty".to_string()),
+            romaji_lrc: None,
+            dual_lrc: None,
+            lines: None,
+        });
+    }
+
+    let has_japanese = contains_japanese(&lyrics);
+    if !has_japanese {
+        return Ok(RomajiResponse {
+            success: true,
+            is_japanese: Some(false),
+            message: Some("No Japanese Kanji/Kana characters detected.".to_string()),
+            romaji_lrc: Some(lyrics.clone()),
+            dual_lrc: Some(lyrics),
+            lines: Some(Vec::new()),
+        });
+    }
+
+    let mut line_items = Vec::new();
+    let mut romaji_lines = Vec::new();
+    let mut dual_lines = Vec::new();
+
     for line in lyrics.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with('[') && trimmed.contains(']') {
-            let parts: Vec<&str> = trimmed.splitn(2, ']').collect();
-            let time = parts[0].trim_start_matches('[').to_string();
-            let text = parts.get(1).unwrap_or(&"").trim().to_string();
-            lines.push(crate::models::RomajiLineItem {
-                time,
-                seconds: 0.0,
-                original: text.clone(),
-                romaji: text,
-            });
+            if let Some(close_idx) = trimmed.find(']') {
+                let time_tag = &trimmed[..=close_idx]; // e.g. "[01:23.45]"
+                let raw_time = &trimmed[1..close_idx]; // e.g. "01:23.45"
+                let text = trimmed[close_idx + 1..].trim();
+
+                let romaji_text = if contains_japanese(text) {
+                    kakasi::convert(text).romaji
+                } else {
+                    text.to_string()
+                };
+
+                let seconds = parse_lrc_timestamp_seconds(raw_time);
+
+                line_items.push(crate::models::RomajiLineItem {
+                    time: raw_time.to_string(),
+                    seconds,
+                    original: text.to_string(),
+                    romaji: romaji_text.clone(),
+                });
+
+                romaji_lines.push(format!("{} {}", time_tag, romaji_text));
+                dual_lines.push(format!("{} {}", time_tag, text));
+                if romaji_text != text && !romaji_text.is_empty() {
+                    dual_lines.push(format!("{} {}", time_tag, romaji_text));
+                }
+                continue;
+            }
+        }
+
+        // Line without timestamp (plain text or header)
+        if contains_japanese(trimmed) {
+            let romaji_text = kakasi::convert(trimmed).romaji;
+            romaji_lines.push(romaji_text.clone());
+            dual_lines.push(trimmed.to_string());
+            if romaji_text != trimmed {
+                dual_lines.push(romaji_text);
+            }
+        } else {
+            romaji_lines.push(trimmed.to_string());
+            dual_lines.push(trimmed.to_string());
         }
     }
 
     Ok(RomajiResponse {
         success: true,
-        is_japanese: Some(false),
-        message: Some("Direct transliteration ready".to_string()),
-        romaji_lrc: Some(lyrics.clone()),
-        dual_lrc: Some(lyrics),
-        lines: Some(lines),
+        is_japanese: Some(true),
+        message: Some("Romaji transliteration successful".to_string()),
+        romaji_lrc: Some(romaji_lines.join("\n")),
+        dual_lrc: Some(dual_lines.join("\n")),
+        lines: Some(line_items),
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_kakasi_transliterate() {
+        let input = "[00:12.34] たぶん私は生きている\n[00:15.00] 風が私を呼んでいる";
+        let res = studio_romaji_transliterate(input.to_string()).unwrap();
+        assert_eq!(res.is_japanese, Some(true));
+        assert!(res.romaji_lrc.is_some());
+        let romaji = res.romaji_lrc.unwrap();
+        assert!(romaji.contains("[00:12.34]"));
+        assert!(romaji.contains("watashi") || romaji.contains("ikiteiru"));
+    }
 }

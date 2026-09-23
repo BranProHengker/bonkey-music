@@ -1285,7 +1285,7 @@ button {
   position: relative;
   z-index: 100;
   gap: 20px;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.4);
 }

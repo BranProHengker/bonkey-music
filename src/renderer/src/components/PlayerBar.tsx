@@ -12,7 +12,8 @@ import {
   MusicNotes,
   List,
   ChatTeardropText,
-  PlusCircle
+  PlusCircle,
+  Heart
 } from '@phosphor-icons/react'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 import { TrackMeta } from '../context/AudioContext'
@@ -260,13 +261,24 @@ export default function PlayerBar({
         </div>
 
         {currentTrack && (
-          <div style={{ position: 'relative' }}>
+          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}>
+            <button
+              className={`btn-player-action ${favorites?.includes(currentTrack.filePath) ? 'active' : ''}`}
+              onClick={() => onToggleFavorite && onToggleFavorite(currentTrack.filePath)}
+              title={favorites?.includes(currentTrack.filePath) ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+              style={{
+                color: favorites?.includes(currentTrack.filePath) ? '#f43f5e' : 'var(--text-secondary)'
+              }}
+            >
+              <Heart size={20} weight={favorites?.includes(currentTrack.filePath) ? 'fill' : 'light'} />
+            </button>
+
             <button 
               className="btn-player-action" 
               onClick={() => setIsPlusMenuOpen((prev) => !prev)}
               title="Add / Actions"
             >
-              <PlusCircle size={22} weight="light" />
+              <PlusCircle size={20} weight="light" />
             </button>
 
             {isPlusMenuOpen && (
@@ -306,11 +318,11 @@ export default function PlayerBar({
                   </button>
                 )}
 
-                {onAddToPlaylist && playlists && (
+                {onAddToPlaylist && (
                   <div className="dropdown-submenu-trigger">
                     <span>Add to Playlist</span>
                     <span className="submenu-arrow">▶</span>
-                    <div className="dropdown-submenu" style={{ bottom: '0', top: 'auto' }}>
+                    <div className="dropdown-submenu" style={{ bottom: '0', top: 'auto', left: '100%', right: 'auto' }}>
                       {onAddToNewPlaylist && (
                         <>
                           <button
@@ -323,12 +335,12 @@ export default function PlayerBar({
                           >
                             ＋ New Playlist
                           </button>
-                          {playlists.length > 0 && (
+                          {playlists && playlists.length > 0 && (
                             <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
                           )}
                         </>
                       )}
-                      {playlists.map((playlist) => (
+                      {playlists && playlists.map((playlist) => (
                         <button
                           key={playlist}
                           className="dropdown-item"

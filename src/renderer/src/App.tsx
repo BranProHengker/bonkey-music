@@ -137,6 +137,8 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  const handleRefreshLibraryRef = useRef<() => void>(() => {})
+
   // ─── Global Keyboard & Mouse Event Listeners ──────────────────────────
   useEffect(() => {
     // 1. Mouse thumb buttons (Back/Forward)
@@ -202,7 +204,10 @@ export default function App(): React.JSX.Element {
       }
 
       if (e.ctrlKey) {
-        if (e.key === 'ArrowRight') {
+        if (e.shiftKey && (e.key === 'r' || e.key === 'R')) {
+          e.preventDefault()
+          handleRefreshLibraryRef.current()
+        } else if (e.key === 'ArrowRight') {
           e.preventDefault()
           nextTrack()
         } else if (e.key === 'ArrowLeft') {
@@ -214,7 +219,7 @@ export default function App(): React.JSX.Element {
         } else if (e.key === 'ArrowDown') {
           e.preventDefault()
           changeVolume(Math.max(0, volume - 0.05))
-        } else if (e.key === 'r' || e.key === 'R') {
+        } else if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
           e.preventDefault()
           toggleShuffle()
         } else if (e.key === 'f' || e.key === 'F') {
@@ -349,6 +354,32 @@ export default function App(): React.JSX.Element {
       setIsScanning(false)
     }
   }
+
+  const handleRefreshLibrary = async () => {
+    if (isScanning) return
+    const foldersToScan = libraryFolders.length > 0 ? libraryFolders : (libraryFolder ? [libraryFolder] : [])
+    if (foldersToScan.length === 0) return
+
+    setIsScanning(true)
+    try {
+      let finalTracks: TrackMeta[] = []
+      for (const folder of foldersToScan) {
+        const res = await window.api.scanFolder(folder)
+        if (Array.isArray(res)) {
+          finalTracks = res as TrackMeta[]
+        }
+      }
+      setTracks(finalTracks)
+    } catch (err) {
+      console.error('Refresh library error:', err)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  useEffect(() => {
+    handleRefreshLibraryRef.current = handleRefreshLibrary
+  })
 
   const handleRemoveFolder = async (folderPath: string) => {
     const confirmRemove = window.confirm(
