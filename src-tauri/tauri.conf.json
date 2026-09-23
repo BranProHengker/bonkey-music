@@ -22,6 +22,12 @@
         "fullscreen": false
       }
     ],
+    "trayIcon": {
+      "id": "main-tray",
+      "iconPath": "icons/32x32.png",
+      "tooltip": "Bonkey Music",
+      "title": "Bonkey Music"
+    },
     "security": {
       "csp": null
     }

@@ -7,6 +7,20 @@ export function setupTauriBridge() {
   // If already in electron preload, do nothing
   if (window.api && !('__isTauri' in window.api)) return
 
+  const w = window as any
+  if (!w.electron) {
+    w.electron = {
+      ipcRenderer: {
+        on: (channel: string, listener: (_event: any, ...args: any[]) => void) => {
+          listen(channel, (event) => {
+            listener(event, event.payload)
+          })
+        },
+        removeAllListeners: (_channel: string) => {}
+      }
+    }
+  }
+
   const api: any = {
     __isTauri: true,
 

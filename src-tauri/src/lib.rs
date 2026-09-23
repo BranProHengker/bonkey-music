@@ -8,6 +8,9 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use tauri::http::{header, Response, StatusCode};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
+use tauri::{Emitter, Manager};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -109,6 +112,82 @@ pub fn run() {
                 .header("Access-Control-Allow-Origin", "*")
                 .body(buffer)
                 .unwrap()
+        })
+        .setup(|app| {
+            if let Some(main_window) = app.get_webview_window("main") {
+                let win_clone = main_window.clone();
+                main_window.on_window_event(move |event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        let _ = win_clone.hide();
+                    }
+                });
+            }
+
+            let show_hide = MenuItem::with_id(app, "toggle_window", "Show / Hide Bonkey Music", true, None::<&str>)?;
+            let sep1 = PredefinedMenuItem::separator(app)?;
+            let play_pause = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
+            let next_track = MenuItem::with_id(app, "next_track", "Next Track", true, None::<&str>)?;
+            let prev_track = MenuItem::with_id(app, "prev_track", "Previous Track", true, None::<&str>)?;
+            let sep2 = PredefinedMenuItem::separator(app)?;
+            let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+            let menu = Menu::with_items(
+                app,
+                &[&show_hide, &sep1, &play_pause, &next_track, &prev_track, &sep2, &quit],
+            )?;
+
+            if let Some(tray) = app.tray_by_id("main-tray") {
+                let _ = tray.set_menu(Some(menu));
+                tray.on_menu_event(|app, event| {
+                    match event.id().as_ref() {
+                        "toggle_window" => {
+                            if let Some(win) = app.get_webview_window("main") {
+                                if win.is_visible().unwrap_or(false) {
+                                    let _ = win.hide();
+                                } else {
+                                    let _ = win.show();
+                                    let _ = win.set_focus();
+                                }
+                            }
+                        }
+                        "play_pause" => {
+                            let _ = app.emit("media-control", "play-pause");
+                        }
+                        "next_track" => {
+                            let _ = app.emit("media-control", "next");
+                        }
+                        "prev_track" => {
+                            let _ = app.emit("media-control", "prev");
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                });
+
+                tray.on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click {
+                        button: MouseButton::Left,
+                        button_state: MouseButtonState::Up,
+                        ..
+                    } = event
+                    {
+                        let app = tray.app_handle();
+                        if let Some(win) = app.get_webview_window("main") {
+                            if win.is_visible().unwrap_or(false) {
+                                let _ = win.hide();
+                            } else {
+                                let _ = win.show();
+                                let _ = win.set_focus();
+                            }
+                        }
+                    }
+                });
+            }
+
+            Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             scan_folder,
