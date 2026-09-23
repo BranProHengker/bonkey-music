@@ -34,8 +34,10 @@ const musicAPI = {
       ipcRenderer.invoke('studio:romaji-transliterate', lyrics),
     saveLrc: (data: { audioFilePath?: string; title: string; artist: string; lrcContent: string }): Promise<any> =>
       ipcRenderer.invoke('studio:save-lrc', data),
-    downloadTrack: (track: any, customDir?: string): Promise<any> =>
-      ipcRenderer.invoke('studio:download-track', track, customDir),
+    getTrackFormats: (track: any): Promise<any[]> =>
+      ipcRenderer.invoke('studio:get-track-formats', track),
+    downloadTrack: (track: any, customDir?: string, formatOption?: any): Promise<any> =>
+      ipcRenderer.invoke('studio:download-track', track, customDir, formatOption),
     inspectLossless: (filePath: string): Promise<any> =>
       ipcRenderer.invoke('studio:inspect-lossless', filePath),
     inspectMultiple: (filePaths: string[]): Promise<any[]> =>

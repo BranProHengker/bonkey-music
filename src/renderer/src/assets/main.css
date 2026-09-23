@@ -3732,4 +3732,19 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+.studio-format-option-card {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.studio-format-option-card:hover {
+  background: rgba(255, 255, 255, 0.065) !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  transform: translateY(-1px);
+}
+
+.studio-format-option-card:active {
+  transform: translateY(0);
+  background: rgba(255, 255, 255, 0.04) !important;
+}
+
 

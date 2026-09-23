@@ -11,9 +11,10 @@ import {
   Sparkle,
   MusicNotes,
   Link,
-  Info
+  Info,
+  X
 } from '@phosphor-icons/react'
-import type { OnlineTrack, DownloadProgress } from '../../../../preload/index.d'
+import type { OnlineTrack, DownloadProgress, TrackFormatOption } from '../../../../preload/index.d'
 import type { TrackMeta } from '../../hooks/useAudioEngine'
 
 interface FlacDownloaderProps {
@@ -51,6 +52,11 @@ export default function FlacDownloader({
   const [previewTrackId, setPreviewTrackId] = useState<string | null>(null)
   const [downloadStatuses, setDownloadStatuses] = useState<Record<string, DownloadStatus>>({})
   const [showCustomUrlDrawer, setShowCustomUrlDrawer] = useState(false)
+
+  // Quality / Format Selector Modal State
+  const [selectedFormatTrack, setSelectedFormatTrack] = useState<OnlineTrack | null>(null)
+  const [availableFormats, setAvailableFormats] = useState<TrackFormatOption[]>([])
+  const [isLoadingFormats, setIsLoadingFormats] = useState(false)
 
   // Custom Direct Stream inputs
   const [customUrl, setCustomUrl] = useState('')
@@ -174,14 +180,39 @@ export default function FlacDownloader({
     })
   }
 
-  const handleDownload = async (track: OnlineTrack) => {
+  const openFormatSelector = async (track: OnlineTrack) => {
+    setSelectedFormatTrack(track)
+    setIsLoadingFormats(true)
+    try {
+      const formats = await window.api.studio.getTrackFormats(track)
+      setAvailableFormats(formats || [])
+    } catch (err) {
+      console.error('Failed to get track formats:', err)
+      if (track.source === 'deezer') {
+        setAvailableFormats([
+          { id: 'flac', label: 'FLAC', desc: 'Lossless · maximum quality', recommended: true, tag: 'FLAC' },
+          { id: 'mp3_320', label: 'MP3 320K', desc: '320 kbps · high quality', tag: 'MP3' },
+          { id: 'mp3_128', label: 'MP3 128K', desc: '128 kbps · smaller size', tag: 'MP3' }
+        ])
+      } else {
+        setAvailableFormats([
+          { id: 5, label: 'MP3 320', desc: '320 kbps' },
+          { id: 6, label: 'FLAC CD', desc: '16-bit · 44.1 kHz', recommended: true }
+        ])
+      }
+    } finally {
+      setIsLoadingFormats(false)
+    }
+  }
+
+  const handleDownload = async (track: OnlineTrack, formatOption?: TrackFormatOption) => {
     setDownloadStatuses((prev) => ({
       ...prev,
       [track.id]: { state: 'downloading', percent: 0 }
     }))
 
     try {
-      const res = await window.api.studio.downloadTrack(track)
+      const res = await window.api.studio.downloadTrack(track, undefined, formatOption)
       if (res.success && res.filePath) {
         setDownloadStatuses((prev) => ({
           ...prev,
@@ -583,7 +614,13 @@ export default function FlacDownloader({
                     {status.state === 'idle' && (
                       <button
                         className="studio-btn-primary"
-                        onClick={() => handleDownload(track)}
+                        onClick={() => {
+                          if (track.source === 'custom') {
+                            handleDownload(track)
+                          } else {
+                            openFormatSelector(track)
+                          }
+                        }}
                       >
                         <DownloadSimple size={15} weight="bold" />
                         <span>Download</span>
@@ -650,7 +687,13 @@ export default function FlacDownloader({
                         <span style={{ fontSize: '11px', color: '#ef4444' }}>{status.error || 'Failed'}</span>
                         <button
                           className="studio-btn-secondary"
-                          onClick={() => handleDownload(track)}
+                          onClick={() => {
+                            if (track.source === 'custom') {
+                              handleDownload(track)
+                            } else {
+                              openFormatSelector(track)
+                            }
+                          }}
                           style={{ padding: '4px 10px', fontSize: '11px' }}
                         >
                           Retry
@@ -661,6 +704,201 @@ export default function FlacDownloader({
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {/* Quality / Format Selection Modal */}
+      {selectedFormatTrack && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.78)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px'
+          }}
+          onClick={() => setSelectedFormatTrack(null)}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '430px',
+              background: '#0e0e11',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              borderRadius: '16px',
+              padding: '22px',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.85)',
+              display: 'flex',
+              flexDirection: 'column',
+              position: 'relative'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => setSelectedFormatTrack(null)}
+              style={{
+                position: 'absolute',
+                top: '16px',
+                right: '16px',
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-tertiary)',
+                cursor: 'pointer',
+                padding: '4px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: '6px'
+              }}
+              title="Close"
+            >
+              <X size={16} />
+            </button>
+
+            {/* Track Header */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', paddingRight: '24px' }}>
+              <div
+                style={{
+                  width: '54px',
+                  height: '54px',
+                  borderRadius: '10px',
+                  overflow: 'hidden',
+                  background: '#1a1a22',
+                  flexShrink: 0
+                }}
+              >
+                {selectedFormatTrack.coverArt ? (
+                  <img
+                    src={selectedFormatTrack.coverArt}
+                    alt={selectedFormatTrack.title}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MusicNotes size={22} weight="light" />
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, gap: '2px', flex: 1 }}>
+                <div style={{ fontSize: '16px', fontWeight: 600, color: '#ffffff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedFormatTrack.title}
+                </div>
+                <div style={{ fontSize: '13px', color: '#9ca3af', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {selectedFormatTrack.artist}
+                </div>
+                {selectedFormatTrack.album && (
+                  <div style={{ fontSize: '12px', color: '#636366', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {selectedFormatTrack.album}
+                  </div>
+                )}
+                <div style={{ marginTop: '2px' }}>
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      fontSize: '10px',
+                      fontWeight: 700,
+                      letterSpacing: '0.6px',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      textTransform: 'uppercase',
+                      background: selectedFormatTrack.source === 'qobuz' ? 'rgba(63, 120, 209, 0.15)' : 'rgba(20, 184, 166, 0.12)',
+                      border: selectedFormatTrack.source === 'qobuz' ? '1px solid rgba(63, 120, 209, 0.4)' : '1px solid rgba(20, 184, 166, 0.35)',
+                      color: selectedFormatTrack.source === 'qobuz' ? '#60a5fa' : '#2dd4bf'
+                    }}
+                  >
+                    {selectedFormatTrack.source === 'qobuz' ? 'QOBUZ' : 'DEEZER'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider */}
+            <div style={{ height: '1px', background: 'rgba(255, 255, 255, 0.07)', margin: '16px 0' }} />
+
+            {/* Formats List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {isLoadingFormats ? (
+                <div style={{ padding: '30px 0', textAlign: 'center', color: '#9ca3af', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                  <ArrowClockwise size={20} className="animate-spin" />
+                  <span style={{ fontSize: '12px' }}>Loading available qualities...</span>
+                </div>
+              ) : (
+                availableFormats.map((fmt) => (
+                  <button
+                    key={fmt.id}
+                    type="button"
+                    className="studio-format-option-card"
+                    onClick={() => {
+                      handleDownload(selectedFormatTrack, fmt)
+                      setSelectedFormatTrack(null)
+                    }}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      width: '100%',
+                      padding: '12px 16px',
+                      background: 'rgba(255, 255, 255, 0.025)',
+                      border: '1px solid rgba(255, 255, 255, 0.07)',
+                      borderRadius: '12px',
+                      cursor: 'pointer',
+                      textAlign: 'left'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '14.5px', fontWeight: 600, color: '#ffffff' }}>
+                        {fmt.label}
+                      </span>
+
+                      {fmt.recommended && (
+                        <span
+                          style={{
+                            background: 'rgba(5, 150, 105, 0.18)',
+                            border: '1px solid rgba(5, 150, 105, 0.45)',
+                            color: '#10b981',
+                            fontSize: '9.5px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            letterSpacing: '0.4px'
+                          }}
+                        >
+                          RECOMMENDED
+                        </span>
+                      )}
+
+                      {fmt.tag && (
+                        <span
+                          style={{
+                            background: 'rgba(20, 184, 166, 0.15)',
+                            border: '1px solid rgba(20, 184, 166, 0.4)',
+                            color: '#2dd4bf',
+                            fontSize: '9.5px',
+                            fontWeight: 700,
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            letterSpacing: '0.4px'
+                          }}
+                        >
+                          {fmt.tag}
+                        </span>
+                      )}
+                    </div>
+
+                    <div style={{ fontSize: '12px', color: '#8e8e93', marginTop: '4px' }}>
+                      {fmt.desc}
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
           </div>
         </div>
       )}

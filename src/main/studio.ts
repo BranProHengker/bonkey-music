@@ -536,8 +536,255 @@ RULES:
     }
   })
 
-  // ─── 5. Download Track with Auto-ID3 & Auto-LRC Pairing ────────────
-  ipcMain.handle('studio:download-track', async (_event, track: OnlineTrack, customDir?: string) => {
+  // ─── 5. Get Available Formats for Track (Deezer / Qobuz) ───────────
+  ipcMain.handle('studio:get-track-formats', async (_event, track: OnlineTrack) => {
+    if (track.source === 'deezer') {
+      return [
+        { id: 'flac', label: 'FLAC', desc: 'Lossless · maximum quality', recommended: true, tag: 'FLAC' },
+        { id: 'mp3_320', label: 'MP3 320K', desc: '320 kbps · high quality', tag: 'MP3' },
+        { id: 'mp3_128', label: 'MP3 128K', desc: '128 kbps · smaller size', tag: 'MP3' }
+      ]
+    }
+
+    if (track.source === 'qobuz') {
+      try {
+        const qobuzUrl = track.previewUrl || `https://open.qobuz.com/track/${track.id.replace('qobuz_', '')}`
+        const res = await fetch(`https://flacdownloader.com/api/qobuz/formats?url=${encodeURIComponent(qobuzUrl)}`, {
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Referer': 'https://flacdownloader.com/en/qobuz'
+          }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (Array.isArray(data.formats) && data.formats.length > 0) {
+            return data.formats.map((f: any) => ({
+              id: f.id,
+              label: f.label || (f.id === 5 ? 'MP3 320' : 'FLAC CD'),
+              desc: f.desc || (f.samplingRate ? `${f.bitDepth || 16}-bit · ${f.samplingRate} kHz` : '16-bit · 44.1 kHz'),
+              recommended: Boolean(f.id === 6 || f.label?.includes('FLAC CD')),
+              tag: undefined
+            }))
+          }
+        }
+      } catch (err) {
+        console.warn('[Studio IPC] Qobuz formats API error, using default fallback:', err)
+      }
+
+      return [
+        { id: 5, label: 'MP3 320', desc: '320 kbps' },
+        { id: 6, label: 'FLAC CD', desc: '16-bit · 44.1 kHz', recommended: true },
+        ...(track.hires
+          ? [
+              { id: 7, label: 'FLAC Hi-Res', desc: '24-bit · 48 kHz' },
+              { id: 27, label: 'FLAC Hi-Res Max', desc: '24-bit · 48 kHz' }
+            ]
+          : [])
+      ]
+    }
+
+    return [
+      { id: 'default', label: 'Audio Stream', desc: 'Direct stream audio', recommended: true }
+    ]
+  })
+
+  // Helper: Background Lossless Scraper Window
+  async function downloadOnlineLosslessTrack(
+    track: OnlineTrack,
+    formatOption: any | undefined,
+    musicDir: string,
+    onProgress: (percent: number, received: number, total: number) => void
+  ): Promise<string> {
+    const formatIdStr = String(formatOption?.id || formatOption?.label || '').toLowerCase()
+    const isMp3 = formatIdStr.includes('mp3')
+    const ext = isMp3 ? 'mp3' : 'flac'
+
+    const safeArtist = (track.artist || 'Unknown').replace(/[\\/:*?"<>|]/g, '_')
+    const safeTitle = (track.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
+    const audioFilePath = join(musicDir, `${safeArtist} - ${safeTitle}.${ext}`)
+
+    const win = new BrowserWindow({
+      show: false,
+      width: 800,
+      height: 700,
+      webPreferences: {
+        nodeIntegration: false,
+        contextIsolation: false
+      }
+    })
+
+    return new Promise<string>((resolve, reject) => {
+      let resolved = false
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true
+          try {
+            if (!win.isDestroyed()) win.destroy()
+          } catch {}
+          reject(new Error('Download timed out after 3 minutes'))
+        }
+      }, 180000)
+
+      const cleanup = () => {
+        clearTimeout(timeout)
+        try {
+          if (!win.isDestroyed()) win.destroy()
+        } catch {}
+      }
+
+      win.webContents.session.on('will-download', (_event, item) => {
+        item.setSavePath(audioFilePath)
+
+        item.on('updated', (_e, state) => {
+          if (state === 'progressing') {
+            const total = item.getTotalBytes()
+            const rec = item.getReceivedBytes()
+            const pct = total > 0 ? Math.round((rec / total) * 100) : 0
+            onProgress(pct, rec, total)
+          }
+        })
+
+        item.once('done', (_e, state) => {
+          cleanup()
+          if (state === 'completed') {
+            resolved = true
+            resolve(audioFilePath)
+          } else {
+            resolved = true
+            reject(new Error(`Download interrupted: ${state}`))
+          }
+        })
+      })
+
+      ;(async () => {
+        try {
+          const isDeezer = track.source === 'deezer'
+          const initialUrl = isDeezer
+            ? 'https://flacdownloader.com/en/deezer'
+            : 'https://flacdownloader.com/en/qobuz'
+
+          await win.loadURL(initialUrl)
+
+          const payload = isDeezer
+            ? {
+                track: {
+                  url: `https://www.deezer.com/track/${track.id.replace('deezer_', '')}`,
+                  link: `https://www.deezer.com/track/${track.id.replace('deezer_', '')}`,
+                  title: track.title,
+                  artist: track.artist,
+                  album: track.album,
+                  cover: track.coverArt
+                },
+                source: 'deezer',
+                lang: 'en'
+              }
+            : {
+                track: {
+                  url: track.previewUrl || `https://open.qobuz.com/track/${track.id.replace('qobuz_', '')}`,
+                  link: track.previewUrl || `https://open.qobuz.com/track/${track.id.replace('qobuz_', '')}`,
+                  title: track.title,
+                  artist: track.artist,
+                  album: track.album,
+                  cover: track.coverArt,
+                  durationMs: (track.duration || 0) * 1000,
+                  bitDepth: track.hires ? 24 : 16,
+                  samplingRate: track.hires ? 48 : 44.1
+                },
+                source: 'qobuz',
+                lang: 'en'
+              }
+
+          await win.webContents.executeJavaScript(`
+            localStorage.setItem('dl_track', JSON.stringify(${JSON.stringify(payload)}));
+          `)
+
+          await win.loadURL('https://flacdownloader.com/en/download')
+
+          let retries = 0
+          const clickInterval = setInterval(async () => {
+            if (resolved || win.isDestroyed()) {
+              clearInterval(clickInterval)
+              return
+            }
+            retries++
+
+            try {
+              const clickSuccess = await win.webContents.executeJavaScript(`
+                (() => {
+                  const btns = Array.from(document.querySelectorAll('button'));
+                  if (btns.length === 0) return false;
+                  const isDeezer = ${JSON.stringify(isDeezer)};
+                  const fId = ${JSON.stringify(formatIdStr)};
+
+                  let targetBtn = null;
+                  if (isDeezer) {
+                    if (fId.includes('128')) {
+                      targetBtn = btns.find(b => b.innerText.includes('128'));
+                    } else if (fId.includes('320')) {
+                      targetBtn = btns.find(b => b.innerText.includes('320'));
+                    } else {
+                      targetBtn = btns.find(b => b.innerText.includes('FLAC'));
+                    }
+                  } else {
+                    if (fId.includes('320')) {
+                      targetBtn = btns.find(b => b.innerText.includes('320'));
+                    } else if (fId.includes('max')) {
+                      targetBtn = btns.find(b => b.innerText.includes('Max'));
+                    } else if (fId.includes('hi-res') || fId === '7') {
+                      targetBtn = btns.find(b => b.innerText.includes('Hi-Res') && !b.innerText.includes('Max'));
+                    } else {
+                      targetBtn = btns.find(b => b.innerText.includes('FLAC CD') || b.innerText.includes('FLAC'));
+                    }
+                  }
+
+                  if (targetBtn) {
+                    targetBtn.click();
+                    return true;
+                  }
+                  return false;
+                })()
+              `)
+
+              if (clickSuccess) {
+                clearInterval(clickInterval)
+
+                let pollCount = 0
+                const progressPoll = setInterval(async () => {
+                  if (resolved || win.isDestroyed() || pollCount > 180) {
+                    clearInterval(progressPoll)
+                    return
+                  }
+                  pollCount++
+                  try {
+                    const text = await win.webContents.executeJavaScript(`
+                      (() => document.body ? document.body.innerText.replace(/\\n+/g, ' ') : '')()
+                    `)
+                    const match = text.match(/Downloading to your device\.\.\.\s*(\d+)%/)
+                    if (match) {
+                      const pct = parseInt(match[1], 10)
+                      onProgress(pct, 0, 0)
+                    }
+                  } catch {}
+                }, 1000)
+              } else if (retries >= 15) {
+                clearInterval(clickInterval)
+                cleanup()
+                reject(new Error('Format option button not found on download page'))
+              }
+            } catch {
+              // Retry on next interval while page settles
+            }
+          }, 800)
+        } catch (err) {
+          cleanup()
+          reject(err)
+        }
+      })()
+    })
+  }
+
+  // ─── 6. Download Track (Full FLAC Scraper / Direct Stream) ─────────
+  ipcMain.handle('studio:download-track', async (_event, track: OnlineTrack, customDir?: string, formatOption?: any) => {
     try {
       const musicDir = customDir && existsSync(customDir) ? customDir : app.getPath('music')
       await mkdir(musicDir, { recursive: true })
@@ -545,77 +792,91 @@ RULES:
       const safeArtist = (track.artist || 'Unknown').replace(/[\\/:*?"<>|]/g, '_')
       const safeTitle = (track.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
       const baseName = `${safeArtist} - ${safeTitle}`
-
-      // Stream audio source
-      const downloadUrl = track.previewUrl || ''
-      if (!downloadUrl) {
-        return { success: false, error: 'No audio stream URL available for this track' }
-      }
-
-      const isFlac = downloadUrl.includes('.flac')
-      const ext = isFlac ? 'flac' : 'mp3'
-      const audioFilePath = join(musicDir, `${baseName}.${ext}`)
-
-      console.log(`[Studio IPC] Downloading audio to: ${audioFilePath}`)
-      const res = await fetch(downloadUrl)
-      if (!res.ok || !res.body) {
-        return { success: false, error: `Failed to fetch audio stream: ${res.statusText}` }
-      }
-
-      const totalBytes = Number(res.headers.get('content-length') || 0)
-      let receivedBytes = 0
-      const chunks: Uint8Array[] = []
-
-      const reader = res.body.getReader()
       const mainWindow = getMainWindow()
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        if (value) {
-          chunks.push(value)
-          receivedBytes += value.length
-          if (mainWindow && !mainWindow.isDestroyed() && totalBytes > 0) {
-            mainWindow.webContents.send('studio:download-progress', {
-              id: track.id,
-              percent: Math.min(100, Math.round((receivedBytes / totalBytes) * 100)),
-              receivedBytes,
-              totalBytes
-            })
+      const sendProgress = (percent: number, receivedBytes: number, totalBytes: number) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('studio:download-progress', {
+            id: track.id,
+            percent: Math.min(100, percent),
+            receivedBytes,
+            totalBytes
+          })
+        }
+      }
+
+      let audioFilePath = ''
+
+      // Case A: Deezer or Qobuz Lossless / High-Res Scraping
+      if (track.source === 'deezer' || track.source === 'qobuz') {
+        console.log(`[Studio IPC] Initiating lossless download for [${track.source.toUpperCase()}]: ${track.artist} - ${track.title}`)
+        sendProgress(2, 0, 0)
+        audioFilePath = await downloadOnlineLosslessTrack(track, formatOption, musicDir, sendProgress)
+        sendProgress(100, 0, 0)
+      } else {
+        // Case B: Direct Stream URL
+        const downloadUrl = track.previewUrl || ''
+        if (!downloadUrl) {
+          return { success: false, error: 'No audio stream URL available for this track' }
+        }
+
+        const isFlac = downloadUrl.includes('.flac')
+        const ext = isFlac ? 'flac' : 'mp3'
+        audioFilePath = join(musicDir, `${baseName}.${ext}`)
+
+        console.log(`[Studio IPC] Downloading direct stream to: ${audioFilePath}`)
+        const res = await fetch(downloadUrl)
+        if (!res.ok || !res.body) {
+          return { success: false, error: `Failed to fetch audio stream: ${res.statusText}` }
+        }
+
+        const totalBytes = Number(res.headers.get('content-length') || 0)
+        let receivedBytes = 0
+        const chunks: Uint8Array[] = []
+        const reader = res.body.getReader()
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          if (value) {
+            chunks.push(value)
+            receivedBytes += value.length
+            if (totalBytes > 0) {
+              sendProgress(Math.round((receivedBytes / totalBytes) * 100), receivedBytes, totalBytes)
+            }
           }
         }
-      }
 
-      const rawAudioBuffer = Buffer.concat(chunks)
+        const rawAudioBuffer = Buffer.concat(chunks)
 
-      // Fetch cover art buffer if available for ID3 embedding
-      let coverBuffer: Buffer | undefined
-      if (track.coverArt) {
-        try {
-          const coverRes = await fetch(track.coverArt)
-          if (coverRes.ok) {
-            const cArr = await coverRes.arrayBuffer()
-            coverBuffer = Buffer.from(cArr)
+        // Fetch cover art buffer if available for ID3 embedding
+        let coverBuffer: Buffer | undefined
+        if (track.coverArt) {
+          try {
+            const coverRes = await fetch(track.coverArt)
+            if (coverRes.ok) {
+              const cArr = await coverRes.arrayBuffer()
+              coverBuffer = Buffer.from(cArr)
+            }
+          } catch (cErr) {
+            console.warn('[Studio IPC] Cover art fetch skipped:', cErr)
           }
-        } catch (cErr) {
-          console.warn('[Studio IPC] Cover art fetch skipped:', cErr)
         }
-      }
 
-      // Auto ID3 Tagging & Cover Art Injection (for MP3)
-      let finalAudioBuffer = rawAudioBuffer
-      if (!isFlac) {
-        try {
-          const id3Tag = buildId3v2Tag(track, coverBuffer)
-          const cleanAudio = stripExistingId3(rawAudioBuffer)
-          finalAudioBuffer = Buffer.concat([id3Tag, cleanAudio])
-          console.log('[Studio IPC] Injected ID3v2 metadata and high-res cover art.')
-        } catch (tagErr) {
-          console.warn('[Studio IPC] ID3 tagging warning (writing raw audio):', tagErr)
+        // Auto ID3 Tagging & Cover Art Injection (for direct MP3 stream)
+        let finalAudioBuffer = rawAudioBuffer
+        if (!isFlac) {
+          try {
+            const id3Tag = buildId3v2Tag(track, coverBuffer)
+            const cleanAudio = stripExistingId3(rawAudioBuffer)
+            finalAudioBuffer = Buffer.concat([id3Tag, cleanAudio])
+          } catch (tagErr) {
+            console.warn('[Studio IPC] ID3 tagging warning:', tagErr)
+          }
         }
-      }
 
-      await writeFile(audioFilePath, finalAudioBuffer)
+        await writeFile(audioFilePath, finalAudioBuffer)
+      }
 
       // Auto-fetch & save matching synced LRC file alongside audio
       let pairedLrcPath: string | undefined
@@ -629,7 +890,6 @@ RULES:
             console.log(`[Studio IPC] Auto-paired synced LRC saved at: ${pairedLrcPath}`)
           }
         } else {
-          // Fallback to search query
           const sRes = await fetch(`https://lrclib.net/api/search?q=${encodeURIComponent(`${track.title} ${track.artist}`)}`)
           if (sRes.ok) {
             const sData = await sRes.json()

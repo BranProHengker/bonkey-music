@@ -63,12 +63,22 @@ export interface DownloadProgress {
   totalBytes: number
 }
 
+export interface TrackFormatOption {
+  id: string | number
+  label: string
+  desc: string
+  recommended?: boolean
+  tag?: string
+  hires?: boolean
+}
+
 export interface StudioAPI {
   searchTracks: (query: string, source?: 'deezer' | 'qobuz') => Promise<OnlineTrack[]>
   searchLrc: (query: string) => Promise<LrcSearchResult[]>
   romajiTransliterate: (lyrics: string) => Promise<RomajiResponse>
   saveLrc: (data: { audioFilePath?: string; title: string; artist: string; lrcContent: string }) => Promise<{ success: boolean; filePath?: string; error?: string }>
-  downloadTrack: (track: OnlineTrack, customDir?: string) => Promise<{ success: boolean; filePath?: string; lrcPath?: string; error?: string }>
+  getTrackFormats: (track: OnlineTrack) => Promise<TrackFormatOption[]>
+  downloadTrack: (track: OnlineTrack, customDir?: string, formatOption?: TrackFormatOption) => Promise<{ success: boolean; filePath?: string; lrcPath?: string; error?: string }>
   inspectLossless: (filePath: string) => Promise<LosslessInspectionResult | null>
   inspectMultiple: (filePaths: string[]) => Promise<LosslessInspectionResult[]>
   selectFile: () => Promise<string | null>
