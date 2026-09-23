@@ -1,6 +1,4 @@
 use crate::models::TrackMeta;
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
 use lofty::config::WriteOptions;
 use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
@@ -56,15 +54,22 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
     let year = tag.and_then(|t| t.year());
     let genre = tag.and_then(|t| t.genre().map(|s| s.to_string()));
 
-    let cover_art = tag.and_then(|t| {
-        t.pictures().first().map(|pic| {
-            let mime = match pic.mime_type() {
-                Some(MimeType::Png) => "image/png",
-                _ => "image/jpeg",
-            };
-            format!("data:{};base64,{}", mime, BASE64.encode(pic.data()))
-        })
-    });
+    let port = crate::services::audio_server::get_server_port();
+    let has_embedded_pic = tag.map(|t| !t.pictures().is_empty()).unwrap_or(false);
+    let cover_art = if has_embedded_pic
+        || path
+            .parent()
+            .map(|p| p.join("cover.jpg").exists() || p.join("folder.jpg").exists())
+            .unwrap_or(false)
+    {
+        Some(format!(
+            "http://127.0.0.1:{}/cover?path={}",
+            port,
+            urlencoding::encode(&path.to_string_lossy())
+        ))
+    } else {
+        None
+    };
 
     let added_at = fs::metadata(path)
         .ok()
@@ -137,3 +142,37 @@ pub fn embed_metadata(
 
     Ok(())
 }
+
+pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
+    if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
+        let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+        if let Some(t) = tag {
+            if let Some(pic) = t.pictures().first() {
+                let mime = match pic.mime_type() {
+                    Some(MimeType::Png) => "image/png",
+                    _ => "image/jpeg",
+                };
+                return Some((pic.data().to_vec(), mime));
+            }
+        }
+    }
+
+    if let Some(parent) = path.parent() {
+        for candidate in &["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png"] {
+            let p = parent.join(candidate);
+            if p.is_file() {
+                if let Ok(data) = fs::read(&p) {
+                    let mime = if candidate.ends_with(".png") {
+                        "image/png"
+                    } else {
+                        "image/jpeg"
+                    };
+                    return Some((data, mime));
+                }
+            }
+        }
+    }
+
+    None
+}
+

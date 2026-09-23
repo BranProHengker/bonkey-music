@@ -67,6 +67,42 @@ pub fn start_audio_server() -> u16 {
                     return;
                 }
 
+                if uri.starts_with("/cover") {
+                    let query = uri.split_once('?').map(|x| x.1).unwrap_or("");
+                    let mut file_path_str = String::new();
+                    for param in query.split('&') {
+                        if let Some(val) = param.strip_prefix("path=") {
+                            file_path_str = urlencoding::decode(val)
+                                .unwrap_or_else(|_| val.into())
+                                .to_string();
+                            break;
+                        }
+                    }
+
+                    if !file_path_str.is_empty() {
+                        let p = std::path::Path::new(&file_path_str);
+                        if let Some((bytes, mime)) = crate::services::metadata::extract_cover_bytes(p) {
+                            let resp = format!(
+                                "HTTP/1.1 200 OK\r\n\
+                                 Content-Type: {}\r\n\
+                                 Content-Length: {}\r\n\
+                                 Cache-Control: public, max-age=86400\r\n\
+                                 Access-Control-Allow-Origin: *\r\n\r\n",
+                                mime,
+                                bytes.len()
+                            );
+                            if socket.write_all(resp.as_bytes()).await.is_ok() && method != "HEAD" {
+                                let _ = socket.write_all(&bytes).await;
+                            }
+                            return;
+                        }
+                    }
+
+                    let resp = "HTTP/1.1 404 Not Found\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: 0\r\n\r\n";
+                    let _ = socket.write_all(resp.as_bytes()).await;
+                    return;
+                }
+
                 // Parse query params (?path=...)
                 let query = uri.split_once('?').map(|x| x.1).unwrap_or("");
                 let mut file_path_str = String::new();

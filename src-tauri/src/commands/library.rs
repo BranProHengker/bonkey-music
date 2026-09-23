@@ -58,7 +58,32 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
 
 #[tauri::command]
 pub fn load_library() -> Result<Vec<TrackMeta>, String> {
-    Ok(read_library_from_disk())
+    let mut tracks = read_library_from_disk();
+    let port = crate::services::audio_server::get_server_port();
+    let mut needs_migration = false;
+
+    for track in &mut tracks {
+        let is_base64 = track.cover_art.as_ref().map(|c| c.starts_with("data:")).unwrap_or(false);
+        if is_base64 {
+            needs_migration = true;
+        }
+
+        // Always ensure cover_art uses dynamic server port
+        if is_base64 || track.cover_art.as_ref().map(|c| c.contains("/cover?path=")).unwrap_or(false) {
+            track.cover_art = Some(format!(
+                "http://127.0.0.1:{}/cover?path={}",
+                port,
+                urlencoding::encode(&track.file_path)
+            ));
+        }
+    }
+
+    if needs_migration {
+        let _ = save_library_to_disk(&tracks);
+        println!("[Library] Migrated library.json from 28MB base64 to ~39KB lightweight URLs!");
+    }
+
+    Ok(tracks)
 }
 
 #[tauri::command]
@@ -162,9 +187,11 @@ mod tests {
     fn test_load_existing_library() {
         let path = get_library_file_path();
         if path.exists() {
-            let tracks = read_library_from_disk();
+            let res = load_library();
+            assert!(res.is_ok());
+            let tracks = res.unwrap();
             assert!(!tracks.is_empty(), "Library should not be empty when file exists");
-            println!("Successfully parsed {} tracks from library.json!", tracks.len());
+            println!("Successfully parsed & migrated {} tracks from library.json!", tracks.len());
         }
     }
 }
