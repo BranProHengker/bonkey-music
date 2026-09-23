@@ -592,16 +592,10 @@ RULES:
   async function downloadOnlineLosslessTrack(
     track: OnlineTrack,
     formatOption: any | undefined,
-    musicDir: string,
+    targetAudioFilePath: string,
     onProgress: (percent: number, received: number, total: number) => void
   ): Promise<string> {
     const formatIdStr = String(formatOption?.id || formatOption?.label || '').toLowerCase()
-    const isMp3 = formatIdStr.includes('mp3')
-    const ext = isMp3 ? 'mp3' : 'flac'
-
-    const safeArtist = (track.artist || 'Unknown').replace(/[\\/:*?"<>|]/g, '_')
-    const safeTitle = (track.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
-    const audioFilePath = join(musicDir, `${safeArtist} - ${safeTitle}.${ext}`)
 
     const win = new BrowserWindow({
       show: false,
@@ -633,7 +627,7 @@ RULES:
       }
 
       win.webContents.session.on('will-download', (_event, item) => {
-        item.setSavePath(audioFilePath)
+        item.setSavePath(targetAudioFilePath)
 
         item.on('updated', (_e, state) => {
           if (state === 'progressing') {
@@ -648,7 +642,7 @@ RULES:
           cleanup()
           if (state === 'completed') {
             resolved = true
-            resolve(audioFilePath)
+            resolve(targetAudioFilePath)
           } else {
             resolved = true
             reject(new Error(`Download interrupted: ${state}`))
@@ -787,11 +781,24 @@ RULES:
   ipcMain.handle('studio:download-track', async (_event, track: OnlineTrack, customDir?: string, formatOption?: any) => {
     try {
       const musicDir = customDir && existsSync(customDir) ? customDir : app.getPath('music')
-      await mkdir(musicDir, { recursive: true })
 
-      const safeArtist = (track.artist || 'Unknown').replace(/[\\/:*?"<>|]/g, '_')
-      const safeTitle = (track.title || 'Untitled').replace(/[\\/:*?"<>|]/g, '_')
-      const baseName = `${safeArtist} - ${safeTitle}`
+      const sanitize = (name: string): string =>
+        (name || '').replace(/[\\/:*?"<>|]/g, '_').trim() || 'Unknown'
+
+      const safeArtist = sanitize(track.artist || 'Unknown Artist')
+      const safeAlbum = sanitize(track.album || track.title || 'Single')
+      const safeTitle = sanitize(track.title || 'Untitled')
+
+      // Standard Album Folder: ~/Music/{Artist}/{Album}/
+      const albumDir = join(musicDir, safeArtist, safeAlbum)
+      await mkdir(albumDir, { recursive: true })
+
+      const formatIdStr = String(formatOption?.id || formatOption?.label || '').toLowerCase()
+      const isMp3 = formatIdStr.includes('mp3')
+      const ext = isMp3 ? 'mp3' : 'flac'
+      const audioFileName = `${safeArtist} - ${safeTitle}.${ext}`
+      const audioFilePath = join(albumDir, audioFileName)
+
       const mainWindow = getMainWindow()
 
       const sendProgress = (percent: number, receivedBytes: number, totalBytes: number) => {
@@ -805,13 +812,11 @@ RULES:
         }
       }
 
-      let audioFilePath = ''
-
       // Case A: Deezer or Qobuz Lossless / High-Res Scraping
       if (track.source === 'deezer' || track.source === 'qobuz') {
         console.log(`[Studio IPC] Initiating lossless download for [${track.source.toUpperCase()}]: ${track.artist} - ${track.title}`)
         sendProgress(2, 0, 0)
-        audioFilePath = await downloadOnlineLosslessTrack(track, formatOption, musicDir, sendProgress)
+        await downloadOnlineLosslessTrack(track, formatOption, audioFilePath, sendProgress)
         sendProgress(100, 0, 0)
       } else {
         // Case B: Direct Stream URL
@@ -819,10 +824,6 @@ RULES:
         if (!downloadUrl) {
           return { success: false, error: 'No audio stream URL available for this track' }
         }
-
-        const isFlac = downloadUrl.includes('.flac')
-        const ext = isFlac ? 'flac' : 'mp3'
-        audioFilePath = join(musicDir, `${baseName}.${ext}`)
 
         console.log(`[Studio IPC] Downloading direct stream to: ${audioFilePath}`)
         const res = await fetch(downloadUrl)
@@ -865,7 +866,7 @@ RULES:
 
         // Auto ID3 Tagging & Cover Art Injection (for direct MP3 stream)
         let finalAudioBuffer = rawAudioBuffer
-        if (!isFlac) {
+        if (ext === 'mp3') {
           try {
             const id3Tag = buildId3v2Tag(track, coverBuffer)
             const cleanAudio = stripExistingId3(rawAudioBuffer)
@@ -878,14 +879,29 @@ RULES:
         await writeFile(audioFilePath, finalAudioBuffer)
       }
 
-      // Auto-fetch & save matching synced LRC file alongside audio
+      // Save album cover art as cover.jpg inside album directory if available
+      const coverFilePath = join(albumDir, 'cover.jpg')
+      if (track.coverArt && !existsSync(coverFilePath)) {
+        try {
+          const coverRes = await fetch(track.coverArt)
+          if (coverRes.ok) {
+            const cArr = await coverRes.arrayBuffer()
+            await writeFile(coverFilePath, Buffer.from(cArr))
+            console.log(`[Studio IPC] Saved album cover art at: ${coverFilePath}`)
+          }
+        } catch (cErr) {
+          console.warn('[Studio IPC] Optional album cover save skipped:', cErr)
+        }
+      }
+
+      // Auto-fetch & save matching synced LRC file alongside audio in the album folder
       let pairedLrcPath: string | undefined
       try {
         const lrcRes = await fetch(`https://lrclib.net/api/get?track_name=${encodeURIComponent(track.title)}&artist_name=${encodeURIComponent(track.artist)}`)
         if (lrcRes.ok) {
           const lrcData = await lrcRes.json()
           if (lrcData.syncedLyrics) {
-            pairedLrcPath = join(musicDir, `${baseName}.lrc`)
+            pairedLrcPath = join(albumDir, `${safeArtist} - ${safeTitle}.lrc`)
             await writeFile(pairedLrcPath, lrcData.syncedLyrics, 'utf-8')
             console.log(`[Studio IPC] Auto-paired synced LRC saved at: ${pairedLrcPath}`)
           }
@@ -894,7 +910,7 @@ RULES:
           if (sRes.ok) {
             const sData = await sRes.json()
             if (Array.isArray(sData) && sData.length > 0 && sData[0].syncedLyrics) {
-              pairedLrcPath = join(musicDir, `${baseName}.lrc`)
+              pairedLrcPath = join(albumDir, `${safeArtist} - ${safeTitle}.lrc`)
               await writeFile(pairedLrcPath, sData[0].syncedLyrics, 'utf-8')
               console.log(`[Studio IPC] Auto-paired synced LRC from search saved at: ${pairedLrcPath}`)
             }
