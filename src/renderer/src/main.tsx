@@ -1,4 +1,4 @@
-import '@fontsource/geist-sans'
+import '@fontsource/outfit'
 import '@fontsource/geist-mono'
 import './assets/main.css'
 

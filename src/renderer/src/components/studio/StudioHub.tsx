@@ -1,11 +1,9 @@
 import { useState } from 'react'
 import {
-  DownloadSimple,
   Sparkle,
   Sliders,
   Equalizer
 } from '@phosphor-icons/react'
-import FlacDownloader from './FlacDownloader'
 import LrcStudio from './LrcStudio'
 import LosslessInspector from './LosslessInspector'
 import type { TrackMeta } from '../../hooks/useAudioEngine'
@@ -23,26 +21,15 @@ interface StudioHubProps {
 
 export default function StudioHub({
   currentTrack,
-  isPlaying,
-  togglePlay,
-  onPlayTrack,
   currentTime = 0,
   seek,
-  onTrackImported,
   allTracks = []
 }: StudioHubProps) {
-  const [activeTab, setActiveTab] = useState<'downloader' | 'lrc' | 'inspector'>('downloader')
+  const [activeTab, setActiveTab] = useState<'lrc' | 'inspector'>('lrc')
   const [lrcInitialQuery, setLrcInitialQuery] = useState('')
-  const [inspectorInitialPath, setInspectorInitialPath] = useState('')
-
   const handleJumpToLrc = (query: string) => {
     setLrcInitialQuery(query)
     setActiveTab('lrc')
-  }
-
-  const handleJumpToInspector = (filePath: string) => {
-    setInspectorInitialPath(filePath)
-    setActiveTab('inspector')
   }
 
   return (
@@ -80,7 +67,7 @@ export default function StudioHub({
               Music Studio
             </h1>
             <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>
-              Lossless audio downloader, quality inspector, and synchronized lyrics editor.
+              Lossless audio quality inspector and synchronized lyrics editor with Romaji transliteration.
             </span>
           </div>
         </div>
@@ -88,19 +75,11 @@ export default function StudioHub({
         {/* Tab Switcher */}
         <div className="studio-segmented">
           <button
-            className={`studio-segmented-pill ${activeTab === 'downloader' ? 'active' : ''}`}
-            onClick={() => setActiveTab('downloader')}
-          >
-            <DownloadSimple size={15} weight={activeTab === 'downloader' ? 'bold' : 'regular'} />
-            <span>FLAC Downloader</span>
-          </button>
-
-          <button
             className={`studio-segmented-pill ${activeTab === 'lrc' ? 'active' : ''}`}
             onClick={() => setActiveTab('lrc')}
           >
             <Sparkle size={15} weight={activeTab === 'lrc' ? 'bold' : 'regular'} />
-            <span>Lyrics Studio</span>
+            <span>Lyrics & Romaji Studio</span>
           </button>
 
           <button
@@ -114,18 +93,6 @@ export default function StudioHub({
       </div>
 
       {/* Tab Panels */}
-      {activeTab === 'downloader' && (
-        <FlacDownloader
-          currentTrack={currentTrack}
-          isPlaying={isPlaying}
-          togglePlay={togglePlay}
-          onPlayTrack={onPlayTrack}
-          onSelectForLrcStudio={handleJumpToLrc}
-          onSelectForInspector={handleJumpToInspector}
-          onTrackImported={onTrackImported}
-        />
-      )}
-
       {activeTab === 'lrc' && (
         <LrcStudio
           currentTrack={currentTrack}
@@ -138,7 +105,6 @@ export default function StudioHub({
       {activeTab === 'inspector' && (
         <LosslessInspector
           currentTrack={currentTrack}
-          initialFilePath={inspectorInitialPath}
           onSelectForLrcStudio={handleJumpToLrc}
           allTracks={allTracks}
         />

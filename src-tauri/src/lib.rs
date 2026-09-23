@@ -281,9 +281,7 @@ pub fn run() {
             export_playlist,
             update_discord_status,
             get_audio_port,
-            studio_search_tracks,
             studio_search_lrc,
-            studio_get_track_formats,
             studio_inspect_lossless,
             studio_inspect_multiple,
             studio_select_file,
@@ -291,7 +289,6 @@ pub fn run() {
             studio_select_folder_to_inspect,
             studio_save_lrc,
             studio_romaji_transliterate,
-            studio_download_track,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

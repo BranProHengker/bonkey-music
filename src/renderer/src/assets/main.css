@@ -20,7 +20,7 @@
   --badge-hires-bg: rgba(255, 255, 255, 0.05);
 
   /* Typography System */
-  --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Outfit', 'Geist Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'Geist Mono', monospace;
 
   /* Text Hierarchy */
@@ -1957,7 +1957,7 @@ button {
   top: 0;
   left: 0;
   right: 0;
-  bottom: 84px; /* Just above the PlayerBar */
+  bottom: 92px; /* Flush with the top of PlayerBar (92px desktop) */
   z-index: 50;
   overflow: hidden;
   display: flex;
@@ -2072,10 +2072,13 @@ button {
   width: 100%;
   max-width: 1560px;
   margin: 0 auto;
-  padding: 40px clamp(32px, 5vw, 80px);
+  padding: clamp(16px, 3vh, 40px) clamp(24px, 4vw, 80px);
   height: 100%;
+  max-height: 100%;
   align-items: center;
-  gap: clamp(48px, 6vw, 100px);
+  gap: clamp(32px, 5vw, 100px);
+  box-sizing: border-box;
+  overflow: hidden;
   transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
@@ -2135,21 +2138,26 @@ button {
 }
 
 .lyrics-left-info {
-  flex: 0 0 auto;
-  width: clamp(320px, 30vw, 460px);
+  flex: 0 1 clamp(240px, 28vw, 420px);
+  max-width: 420px;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 28px;
+  gap: clamp(12px, 2.5vh, 24px);
+  min-height: 0;
 }
 
 .lyrics-cover-wrapper {
   width: 100%;
+  max-width: min(100%, calc(100vh - 360px));
+  max-height: min(400px, 46vh);
   aspect-ratio: 1 / 1;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 24px 56px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.1);
   transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 1;
 }
 
 .lyrics-cover-wrapper:hover {
@@ -2180,7 +2188,7 @@ button {
 
 .lyrics-track-title {
   font-family: var(--font-sans);
-  font-size: clamp(28px, 2.5vw, 40px);
+  font-size: clamp(20px, 2.2vw, 36px);
   font-weight: 800;
   color: var(--text-primary);
   margin-bottom: 2px;
@@ -2195,13 +2203,13 @@ button {
 
 .lyrics-track-artist {
   font-family: var(--font-sans);
-  font-size: clamp(16px, 1.3vw, 20px);
+  font-size: clamp(15px, 1.2vw, 18px);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.85);
 }
 
 .lyrics-track-album {
-  font-size: clamp(14px, 1.1vw, 16px);
+  font-size: clamp(13px, 1vw, 15px);
   color: var(--text-secondary);
 }
 
@@ -2225,8 +2233,9 @@ button {
 .lyrics-right-list {
   position: relative;
   flex: 1;
-  height: 86%;
-  min-height: 420px;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
   overflow: hidden; /* GPU translate scroller */
   padding: 0;
   mask-image: linear-gradient(to bottom, transparent 0%, white 14%, white 86%, transparent 100%);
@@ -3337,6 +3346,10 @@ button {
     grid-template-rows: 36px 1fr 80px;
   }
 
+  .lyrics-view-overlay {
+    bottom: 80px;
+  }
+
   .sidebar {
     display: none;
   }
@@ -3472,6 +3485,10 @@ button {
 @media (max-width: 450px) {
   .app-container {
     grid-template-rows: 32px 1fr 70px;
+  }
+
+  .lyrics-view-overlay {
+    bottom: 70px;
   }
 
   .player-bar {

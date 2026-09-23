@@ -96,6 +96,7 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
     })
 }
 
+#[allow(dead_code)]
 pub fn embed_metadata(
     path: &Path,
     title: &str,

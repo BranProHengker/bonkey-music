@@ -36,23 +36,3 @@ pub struct LosslessInspectionResult {
     pub verdict_label: String,
     pub spectrum_bins: Vec<f64>,
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TrackFormatOption {
-    pub id: serde_json::Value,
-    pub label: String,
-    pub desc: String,
-    pub recommended: Option<bool>,
-    pub tag: Option<String>,
-    pub hires: Option<bool>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DownloadProgress {
-    pub id: String,
-    pub percent: u32,
-    pub received_bytes: u64,
-    pub total_bytes: u64,
-}

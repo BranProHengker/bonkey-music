@@ -69,11 +69,8 @@ export function setupTauriBridge() {
     selectImage: () => invoke('select_image'),
     openFileLocation: (filePath: string) => invoke('open_file_location', { filePath }),
 
-    // Studio & Scraper
+    // Studio: Lyrics & Lossless Inspector
     studio: {
-      searchTracks: (query: string, source?: string) =>
-        invoke('studio_search_tracks', { query, source }),
-
       searchLrc: (query: string) =>
         invoke('studio_search_lrc', { query }),
 
@@ -82,12 +79,6 @@ export function setupTauriBridge() {
 
       saveLrc: (data: { audioFilePath?: string; title: string; artist: string; lrcContent: string }) =>
         invoke('studio_save_lrc', { data }),
-
-      getTrackFormats: (track: any) =>
-        invoke('studio_get_track_formats', { track }),
-
-      downloadTrack: (track: any, customDir?: string, formatOption?: any) =>
-        invoke('studio_download_track', { track, customDir, formatOption }),
 
       inspectLossless: (filePath: string) =>
         invoke('studio_inspect_lossless', { filePath }),
@@ -102,31 +93,7 @@ export function setupTauriBridge() {
         invoke('studio_select_multiple_files'),
 
       selectFolderToInspect: () =>
-        invoke('studio_select_folder_to_inspect'),
-
-      onDownloadProgress: (callback: (progress: any) => void) => {
-        let active = true
-        let unlistenFn: (() => void) | null = null
-
-        listen('studio:download-progress', (event) => {
-          if (active) {
-            callback(event.payload)
-          }
-        }).then((unlisten) => {
-          if (active) {
-            unlistenFn = unlisten
-          } else {
-            unlisten()
-          }
-        })
-
-        return () => {
-          active = false
-          if (unlistenFn) {
-            unlistenFn()
-          }
-        }
-      }
+        invoke('studio_select_folder_to_inspect')
     }
   }
 
