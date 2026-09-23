@@ -46,6 +46,10 @@ export interface AudioContextType {
 export const AudioContext = createContext<AudioContextType | undefined>(undefined)
 
 const getAudioUrl = (filePath: string): string => {
+  const w = typeof window !== 'undefined' ? (window as any) : null
+  if (w?.api?.getAudioUrl) {
+    return w.api.getAudioUrl(filePath)
+  }
   if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
     return filePath
   }

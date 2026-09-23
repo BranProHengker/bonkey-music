@@ -3,11 +3,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn get_settings_file_path() -> PathBuf {
-    let dir = dirs::data_local_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("bonkey-music");
-    let _ = fs::create_dir_all(&dir);
-    dir.join("settings.json")
+    crate::commands::library::get_app_dir().join("settings.json")
 }
 
 #[tauri::command]

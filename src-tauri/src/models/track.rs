@@ -12,7 +12,7 @@ pub struct TrackMeta {
     pub year: Option<u32>,
     pub genre: Option<String>,
     pub cover_art: Option<String>,
-    pub bitrate: Option<u32>,
+    pub bitrate: Option<f64>,
     pub sample_rate: Option<u32>,
     pub bits_per_sample: Option<u32>,
     pub lossless: Option<bool>,

@@ -74,3 +74,8 @@ pub fn export_playlist(name: String, file_paths: Vec<String>) -> Result<Value, S
 pub fn update_discord_status(state: State<'_, DiscordState>, song_data: Value) {
     state.0.update(&song_data);
 }
+
+#[tauri::command]
+pub fn get_audio_port() -> u16 {
+    crate::services::audio_server::get_server_port()
+}

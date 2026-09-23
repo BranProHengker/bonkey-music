@@ -21,8 +21,36 @@ export function setupTauriBridge() {
     }
   }
 
+  let cachedAudioPort = 0
+  const fetchAudioPort = () => {
+    invoke<number>('get_audio_port')
+      .then((port) => {
+        if (port && port > 0) {
+          cachedAudioPort = port
+        }
+      })
+      .catch((err) => {
+        console.warn('[TauriBridge] Failed to get audio port:', err)
+      })
+  }
+  fetchAudioPort()
+
   const api: any = {
     __isTauri: true,
+
+    getAudioPort: () => invoke('get_audio_port'),
+    getAudioUrl: (filePath: string) => {
+      if (!filePath) return ''
+      if (filePath.startsWith('http://') || filePath.startsWith('https://')) {
+        return filePath
+      }
+      if (cachedAudioPort > 0) {
+        return `http://127.0.0.1:${cachedAudioPort}/stream?path=${encodeURIComponent(filePath)}`
+      }
+      fetchAudioPort()
+      const normalizedPath = filePath.replace(/\\/g, '/')
+      return `media:///${encodeURI(normalizedPath).replace(/\?/g, '%3F').replace(/#/g, '%23')}`
+    },
 
     // Library & Settings
     selectFolder: () => invoke('select_folder'),

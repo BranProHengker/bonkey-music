@@ -82,7 +82,7 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
         year,
         genre,
         cover_art,
-        bitrate,
+        bitrate: bitrate.map(|b| b as f64),
         sample_rate,
         bits_per_sample,
         lossless: Some(lossless),

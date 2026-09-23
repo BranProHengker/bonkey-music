@@ -4,12 +4,29 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
-fn get_library_file_path() -> PathBuf {
-    let dir = dirs::data_local_dir()
+pub fn get_app_dir() -> PathBuf {
+    if let Some(config) = dirs::config_dir() {
+        let dir = config.join("bonkey-music");
+        if dir.exists() {
+            return dir;
+        }
+    }
+    if let Some(data) = dirs::data_local_dir() {
+        let dir = data.join("bonkey-music");
+        if dir.exists() {
+            return dir;
+        }
+    }
+    let dir = dirs::config_dir()
+        .or_else(dirs::data_local_dir)
         .unwrap_or_else(|| PathBuf::from("."))
         .join("bonkey-music");
     let _ = fs::create_dir_all(&dir);
-    dir.join("library.json")
+    dir
+}
+
+fn get_library_file_path() -> PathBuf {
+    get_app_dir().join("library.json")
 }
 
 fn save_library_to_disk(tracks: &[TrackMeta]) -> Result<(), String> {
@@ -24,10 +41,19 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
     if !path.exists() {
         return Vec::new();
     }
-    fs::read_to_string(path)
-        .ok()
-        .and_then(|data| serde_json::from_str(&data).ok())
-        .unwrap_or_default()
+    match fs::read_to_string(&path) {
+        Ok(data) => match serde_json::from_str::<Vec<TrackMeta>>(&data) {
+            Ok(tracks) => tracks,
+            Err(e) => {
+                eprintln!("[Bonkey Music] Failed to parse library.json: {}", e);
+                Vec::new()
+            }
+        },
+        Err(e) => {
+            eprintln!("[Bonkey Music] Failed to read library.json: {}", e);
+            Vec::new()
+        }
+    }
 }
 
 #[tauri::command]
@@ -126,4 +152,19 @@ pub fn get_lyrics(audio_file_path: String) -> Result<Option<String>, String> {
         return fs::read_to_string(lrc_path).map(Some).map_err(|e| e.to_string());
     }
     Ok(None)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_load_existing_library() {
+        let path = get_library_file_path();
+        if path.exists() {
+            let tracks = read_library_from_disk();
+            assert!(!tracks.is_empty(), "Library should not be empty when file exists");
+            println!("Successfully parsed {} tracks from library.json!", tracks.len());
+        }
+    }
 }
