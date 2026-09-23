@@ -12,12 +12,16 @@ pub async fn studio_search_lrc(query: String) -> Result<Vec<LrcSearchResult>, St
 }
 
 #[tauri::command]
-pub fn studio_inspect_lossless(file_path: String) -> Result<Option<LosslessInspectionResult>, String> {
+pub fn studio_inspect_lossless(
+    file_path: String,
+) -> Result<Option<LosslessInspectionResult>, String> {
     Ok(inspect_file(&file_path))
 }
 
 #[tauri::command]
-pub fn studio_inspect_multiple(file_paths: Vec<String>) -> Result<Vec<LosslessInspectionResult>, String> {
+pub fn studio_inspect_multiple(
+    file_paths: Vec<String>,
+) -> Result<Vec<LosslessInspectionResult>, String> {
     let mut results = Vec::new();
     for fp in file_paths {
         if let Some(res) = inspect_file(&fp) {
@@ -30,7 +34,10 @@ pub fn studio_inspect_multiple(file_paths: Vec<String>) -> Result<Vec<LosslessIn
 #[tauri::command]
 pub fn studio_select_file() -> Result<Option<String>, String> {
     let file = rfd::FileDialog::new()
-        .add_filter("Audio Files", &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"])
+        .add_filter(
+            "Audio Files",
+            &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
+        )
         .pick_file();
     Ok(file.map(|p| p.to_string_lossy().to_string()))
 }
@@ -38,7 +45,10 @@ pub fn studio_select_file() -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn studio_select_multiple_files() -> Result<Vec<String>, String> {
     let files = rfd::FileDialog::new()
-        .add_filter("Audio Files", &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"])
+        .add_filter(
+            "Audio Files",
+            &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
+        )
         .pick_files();
     Ok(files
         .unwrap_or_default()
@@ -56,7 +66,11 @@ pub fn studio_select_folder_to_inspect() -> Result<Vec<String>, String> {
         for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
             let p = entry.path();
             if p.is_file() {
-                if let Some(ext) = p.extension().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) {
+                if let Some(ext) = p
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_lowercase())
+                {
                     if valid_exts.contains(&ext.as_str()) {
                         files.push(p.to_string_lossy().to_string());
                     }
@@ -113,9 +127,18 @@ fn resolve_target_music_dir(custom_dir: Option<String>) -> PathBuf {
 
 #[tauri::command]
 pub fn studio_save_lrc(data: Value) -> Result<Value, String> {
-    let title = data.get("title").and_then(|v| v.as_str()).unwrap_or("Untitled");
-    let artist = data.get("artist").and_then(|v| v.as_str()).unwrap_or("Unknown");
-    let lrc_content = data.get("lrcContent").and_then(|v| v.as_str()).unwrap_or("");
+    let title = data
+        .get("title")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Untitled");
+    let artist = data
+        .get("artist")
+        .and_then(|v| v.as_str())
+        .unwrap_or("Unknown");
+    let lrc_content = data
+        .get("lrcContent")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     let audio_file_path = data.get("audioFilePath").and_then(|v| v.as_str());
 
     let target_path = if let Some(afp) = audio_file_path {
@@ -167,4 +190,3 @@ pub fn studio_romaji_transliterate(lyrics: String) -> Result<RomajiResponse, Str
         lines: Some(lines),
     })
 }
-

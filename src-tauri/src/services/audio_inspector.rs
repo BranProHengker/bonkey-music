@@ -24,10 +24,7 @@ pub fn inspect_file(file_path_str: &str) -> Option<LosslessInspectionResult> {
         .unwrap_or("audio")
         .to_lowercase();
 
-    let lossless = match ext.as_str() {
-        "flac" | "wav" | "alac" | "aiff" => true,
-        _ => false,
-    };
+    let lossless = matches!(ext.as_str(), "flac" | "wav" | "alac" | "aiff");
 
     let sample_rate = properties.sample_rate().unwrap_or(44100);
     let bits_per_sample = properties.bit_depth().unwrap_or(16) as u32;

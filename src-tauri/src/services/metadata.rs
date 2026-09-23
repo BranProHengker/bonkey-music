@@ -26,12 +26,11 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
         .unwrap_or("")
         .to_lowercase();
 
-    let lossless = match ext.as_str() {
-        "flac" | "wav" | "alac" | "aiff" => true,
-        _ => false,
-    };
+    let lossless = matches!(ext.as_str(), "flac" | "wav" | "alac" | "aiff");
 
-    let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+    let tag = tagged_file
+        .primary_tag()
+        .or_else(|| tagged_file.first_tag());
 
     let title = tag
         .and_then(|t| t.title().map(|s| s.to_string()))
@@ -146,7 +145,9 @@ pub fn embed_metadata(
 
 pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
     if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
-        let tag = tagged_file.primary_tag().or_else(|| tagged_file.first_tag());
+        let tag = tagged_file
+            .primary_tag()
+            .or_else(|| tagged_file.first_tag());
         if let Some(t) = tag {
             if let Some(pic) = t.pictures().first() {
                 let mime = match pic.mime_type() {
@@ -159,7 +160,14 @@ pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
     }
 
     if let Some(parent) = path.parent() {
-        for candidate in &["cover.jpg", "cover.png", "folder.jpg", "folder.png", "front.jpg", "front.png"] {
+        for candidate in &[
+            "cover.jpg",
+            "cover.png",
+            "folder.jpg",
+            "folder.png",
+            "front.jpg",
+            "front.png",
+        ] {
             let p = parent.join(candidate);
             if p.is_file() {
                 if let Ok(data) = fs::read(&p) {
@@ -176,4 +184,3 @@ pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
 
     None
 }
-

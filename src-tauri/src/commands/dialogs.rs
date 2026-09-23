@@ -15,7 +15,12 @@ pub fn select_folder() -> Result<Option<String>, String> {
 #[tauri::command]
 pub fn select_files() -> Result<Vec<String>, String> {
     let files = rfd::FileDialog::new()
-        .add_filter("Audio Files", &["mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff"])
+        .add_filter(
+            "Audio Files",
+            &[
+                "mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff",
+            ],
+        )
         .pick_files();
     Ok(files
         .unwrap_or_default()
@@ -47,7 +52,7 @@ pub fn open_file_location(file_path: String) -> Result<bool, String> {
 #[tauri::command]
 pub fn export_playlist(name: String, file_paths: Vec<String>) -> Result<Value, String> {
     let save_path = rfd::FileDialog::new()
-        .set_file_name(&format!("{}.m3u8", name))
+        .set_file_name(format!("{}.m3u8", name))
         .add_filter("M3U8 Playlist", &["m3u8"])
         .save_file();
 

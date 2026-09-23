@@ -63,13 +63,23 @@ pub fn load_library() -> Result<Vec<TrackMeta>, String> {
     let mut needs_migration = false;
 
     for track in &mut tracks {
-        let is_base64 = track.cover_art.as_ref().map(|c| c.starts_with("data:")).unwrap_or(false);
+        let is_base64 = track
+            .cover_art
+            .as_ref()
+            .map(|c| c.starts_with("data:"))
+            .unwrap_or(false);
         if is_base64 {
             needs_migration = true;
         }
 
         // Always ensure cover_art uses dynamic server port
-        if is_base64 || track.cover_art.as_ref().map(|c| c.contains("/cover?path=")).unwrap_or(false) {
+        if is_base64
+            || track
+                .cover_art
+                .as_ref()
+                .map(|c| c.contains("/cover?path="))
+                .unwrap_or(false)
+        {
             track.cover_art = Some(format!(
                 "http://127.0.0.1:{}/cover?path={}",
                 port,
@@ -101,12 +111,18 @@ pub fn scan_folder(path: String) -> Result<Vec<TrackMeta>, String> {
     }
 
     let mut scanned_tracks = Vec::new();
-    let valid_exts = ["mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff"];
+    let valid_exts = [
+        "mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff",
+    ];
 
     for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
         let p = entry.path();
         if p.is_file() {
-            if let Some(ext) = p.extension().and_then(|s| s.to_str()).map(|s| s.to_lowercase()) {
+            if let Some(ext) = p
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_lowercase())
+            {
                 if valid_exts.contains(&ext.as_str()) {
                     if let Ok(meta) = read_track_metadata(p) {
                         scanned_tracks.push(meta);
@@ -174,7 +190,9 @@ pub fn get_lyrics(audio_file_path: String) -> Result<Option<String>, String> {
     let p = Path::new(&audio_file_path);
     let lrc_path = p.with_extension("lrc");
     if lrc_path.exists() {
-        return fs::read_to_string(lrc_path).map(Some).map_err(|e| e.to_string());
+        return fs::read_to_string(lrc_path)
+            .map(Some)
+            .map_err(|e| e.to_string());
     }
     Ok(None)
 }
@@ -190,8 +208,14 @@ mod tests {
             let res = load_library();
             assert!(res.is_ok());
             let tracks = res.unwrap();
-            assert!(!tracks.is_empty(), "Library should not be empty when file exists");
-            println!("Successfully parsed & migrated {} tracks from library.json!", tracks.len());
+            assert!(
+                !tracks.is_empty(),
+                "Library should not be empty when file exists"
+            );
+            println!(
+                "Successfully parsed & migrated {} tracks from library.json!",
+                tracks.len()
+            );
         }
     }
 }

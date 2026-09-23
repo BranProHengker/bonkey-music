@@ -1,10 +1,10 @@
 [package]
-name = "app"
+name = "bonkey-music"
 version = "2.2.0"
 description = "A Tauri App"
-authors = ["you"]
+authors = ["Avttr"]
 license = ""
-repository = ""
+repository = "https://github.com/BranProHengker/bonkey-music"
 edition = "2021"
 rust-version = "1.77.2"
 

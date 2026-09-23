@@ -65,32 +65,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "330a5ed07fa54e4702c9d6c4174f74427fc0ef6e214bbd677ae50a5099946470"
 
 [[package]]
-name = "app"
-version = "2.2.0"
-dependencies = [
- "base64 0.22.1",
- "dirs",
- "discord-rich-presence",
- "libloading 0.8.9",
- "lofty",
- "log",
- "open",
- "reqwest 0.12.28",
- "rfd",
- "rustfft",
- "sanitize-filename",
- "serde",
- "serde_json",
- "symphonia",
- "tauri",
- "tauri-build",
- "tauri-plugin-log",
- "tokio",
- "urlencoding",
- "walkdir",
-]
-
-[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -383,6 +357,32 @@ dependencies = [
  "futures-io",
  "futures-lite",
  "piper",
+]
+
+[[package]]
+name = "bonkey-music"
+version = "2.2.0"
+dependencies = [
+ "base64 0.22.1",
+ "dirs",
+ "discord-rich-presence",
+ "libloading 0.8.9",
+ "lofty",
+ "log",
+ "open",
+ "reqwest 0.12.28",
+ "rfd",
+ "rustfft",
+ "sanitize-filename",
+ "serde",
+ "serde_json",
+ "symphonia",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-log",
+ "tokio",
+ "urlencoding",
+ "walkdir",
 ]
 
 [[package]]

@@ -52,13 +52,11 @@ impl DiscordService {
                 let title = title.unwrap();
 
                 // Throttle reconnection attempts to at most once every 15 seconds
-                if client.is_none() {
-                    if last_connect_attempt.elapsed() >= Duration::from_secs(15) {
-                        last_connect_attempt = Instant::now();
-                        if let Ok(mut c) = DiscordIpcClient::new("1519697840094580757") {
-                            if c.connect().is_ok() {
-                                client = Some(c);
-                            }
+                if client.is_none() && last_connect_attempt.elapsed() >= Duration::from_secs(15) {
+                    last_connect_attempt = Instant::now();
+                    if let Ok(mut c) = DiscordIpcClient::new("1519697840094580757") {
+                        if c.connect().is_ok() {
+                            client = Some(c);
                         }
                     }
                 }

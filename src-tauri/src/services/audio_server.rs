@@ -31,13 +31,19 @@ pub fn start_audio_server() -> u16 {
     };
 
     AUDIO_PORT.store(port, Ordering::SeqCst);
-    println!("[AudioServer] Streaming server running at http://127.0.0.1:{}", port);
+    println!(
+        "[AudioServer] Streaming server running at http://127.0.0.1:{}",
+        port
+    );
 
     tauri::async_runtime::spawn(async move {
         let listener = match TcpListener::from_std(std_listener) {
             Ok(l) => l,
             Err(e) => {
-                eprintln!("[AudioServer] Failed to convert to Tokio TcpListener: {}", e);
+                eprintln!(
+                    "[AudioServer] Failed to convert to Tokio TcpListener: {}",
+                    e
+                );
                 return;
             }
         };
@@ -81,7 +87,9 @@ pub fn start_audio_server() -> u16 {
 
                     if !file_path_str.is_empty() {
                         let p = std::path::Path::new(&file_path_str);
-                        if let Some((bytes, mime)) = crate::services::metadata::extract_cover_bytes(p) {
+                        if let Some((bytes, mime)) =
+                            crate::services::metadata::extract_cover_bytes(p)
+                        {
                             let resp = format!(
                                 "HTTP/1.1 200 OK\r\n\
                                  Content-Type: {}\r\n\
