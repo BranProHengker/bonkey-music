@@ -1,7 +1,35 @@
 use discord_rich_presence::{activity, DiscordIpc, DiscordIpcClient};
+use std::collections::HashMap;
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+
+fn fetch_online_artwork(
+    http_client: &reqwest::blocking::Client,
+    title: &str,
+    artist: &str,
+) -> Option<String> {
+    let clean_artist = if artist == "Unknown Artist" {
+        ""
+    } else {
+        artist
+    };
+    let term = format!("{} {}", title, clean_artist).trim().to_string();
+    let url = format!(
+        "https://itunes.apple.com/search?term={}&entity=song&limit=1",
+        urlencoding::encode(&term)
+    );
+
+    let resp = http_client.get(&url).send().ok()?;
+    let json: serde_json::Value = resp.json().ok()?;
+    let artwork = json
+        .get("results")?
+        .get(0)?
+        .get("artworkUrl100")?
+        .as_str()?;
+
+    Some(artwork.replace("100x100bb.jpg", "512x512bb.jpg"))
+}
 
 pub struct DiscordService {
     sender: Sender<serde_json::Value>,
@@ -14,6 +42,11 @@ impl DiscordService {
         thread::spawn(move || {
             let mut client: Option<DiscordIpcClient> = None;
             let mut last_connect_attempt = Instant::now();
+            let http_client = reqwest::blocking::Client::builder()
+                .timeout(Duration::from_secs(2))
+                .build()
+                .unwrap_or_default();
+            let mut artwork_cache: HashMap<String, Option<String>> = HashMap::new();
 
             // Attempt initial connection immediately
             if let Ok(mut c) = DiscordIpcClient::new("1519697840094580757") {
@@ -42,6 +75,10 @@ impl DiscordService {
                     .get("currentTime")
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0);
+                let duration = latest_data
+                    .get("duration")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0);
 
                 if title.is_none() {
                     if let Some(c) = client.as_mut() {
@@ -68,9 +105,17 @@ impl DiscordService {
                         format!("by {} • Paused", artist)
                     };
 
+                    let cache_key = format!("{} - {}", artist, title);
+                    let cover_url = artwork_cache
+                        .entry(cache_key)
+                        .or_insert_with(|| fetch_online_artwork(&http_client, title, artist))
+                        .clone();
+
+                    let large_img = cover_url.as_deref().unwrap_or("logo_app");
+
                     let mut assets = activity::Assets::new()
-                        .large_image("logo_app")
-                        .large_text("Bonkey Music");
+                        .large_image(large_img)
+                        .large_text(title);
 
                     if is_playing {
                         assets = assets.small_image("play_icon").small_text("Playing");
@@ -79,6 +124,7 @@ impl DiscordService {
                     }
 
                     let mut act = activity::Activity::new()
+                        .activity_type(activity::ActivityType::Listening)
                         .details(title)
                         .state(&state_str)
                         .assets(assets);
@@ -89,7 +135,12 @@ impl DiscordService {
                             .unwrap_or_default()
                             .as_secs() as i64;
                         let start = (now_epoch - current_time as i64).max(0);
-                        act = act.timestamps(activity::Timestamps::new().start(start));
+                        let mut timestamps = activity::Timestamps::new().start(start);
+                        if duration > 0.0 {
+                            let end = start + duration as i64;
+                            timestamps = timestamps.end(end);
+                        }
+                        act = act.timestamps(timestamps);
                     }
 
                     if c.set_activity(act).is_err() {

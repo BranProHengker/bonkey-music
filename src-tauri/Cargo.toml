@@ -24,7 +24,7 @@ log = "0.4"
 tauri = { version = "2.11.6", features = ["tray-icon"] }
 tauri-plugin-log = "2"
 tokio = { version = "1", features = ["full"] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream", "blocking"] }
 lofty = "0.21"
 symphonia = { version = "0.5", features = ["all"] }
 rustfft = "6"
