@@ -100,7 +100,92 @@ pub fn load_library() -> Result<Vec<TrackMeta>, String> {
 pub fn reset_library() -> Result<Vec<TrackMeta>, String> {
     let empty: Vec<TrackMeta> = Vec::new();
     save_library_to_disk(&empty)?;
+
+    let settings_path = crate::commands::settings::get_settings_file_path();
+    if settings_path.exists() {
+        if let Ok(data) = fs::read_to_string(&settings_path) {
+            if let Ok(mut current) = serde_json::from_str::<serde_json::Value>(&data) {
+                if let Some(obj) = current.as_object_mut() {
+                    obj.remove("libraryFolder");
+                    obj.insert("libraryFolders".to_string(), serde_json::json!([]));
+                    if let Ok(json) = serde_json::to_string_pretty(&current) {
+                        let _ = fs::write(settings_path, json);
+                    }
+                }
+            }
+        }
+    }
+
     Ok(empty)
+}
+
+fn save_folder_to_settings(folder_path: &str) {
+    let settings_path = crate::commands::settings::get_settings_file_path();
+    let mut current: serde_json::Value = if settings_path.exists() {
+        let data = fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".to_string());
+        serde_json::from_str(&data).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    if let Some(obj) = current.as_object_mut() {
+        obj.insert(
+            "libraryFolder".to_string(),
+            serde_json::Value::String(folder_path.to_string()),
+        );
+        let mut folders: Vec<String> = obj
+            .get("libraryFolders")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        if !folders.contains(&folder_path.to_string()) {
+            folders.push(folder_path.to_string());
+        }
+        obj.insert("libraryFolders".to_string(), serde_json::json!(folders));
+    }
+    if let Ok(json) = serde_json::to_string_pretty(&current) {
+        let _ = fs::write(settings_path, json);
+    }
+}
+
+fn remove_folder_from_settings(folder_path: &str) {
+    let settings_path = crate::commands::settings::get_settings_file_path();
+    if !settings_path.exists() {
+        return;
+    }
+    let data = fs::read_to_string(&settings_path).unwrap_or_else(|_| "{}".to_string());
+    let mut current: serde_json::Value =
+        serde_json::from_str(&data).unwrap_or(serde_json::json!({}));
+
+    if let Some(obj) = current.as_object_mut() {
+        let mut folders: Vec<String> = obj
+            .get("libraryFolders")
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|item| item.as_str().map(|s| s.to_string()))
+                    .collect()
+            })
+            .unwrap_or_default();
+        folders.retain(|f| f != folder_path);
+        let next_primary = folders.first().cloned();
+        obj.insert("libraryFolders".to_string(), serde_json::json!(folders));
+        match next_primary {
+            Some(p) => {
+                obj.insert("libraryFolder".to_string(), serde_json::Value::String(p));
+            }
+            None => {
+                obj.remove("libraryFolder");
+            }
+        }
+    }
+    if let Ok(json) = serde_json::to_string_pretty(&current) {
+        let _ = fs::write(settings_path, json);
+    }
 }
 
 #[tauri::command]
@@ -142,6 +227,7 @@ pub fn scan_folder(path: String) -> Result<Vec<TrackMeta>, String> {
     }
 
     save_library_to_disk(&existing)?;
+    save_folder_to_settings(&path);
     Ok(existing)
 }
 
@@ -170,6 +256,7 @@ pub fn remove_library_folder(path: String) -> Result<Vec<TrackMeta>, String> {
     let mut existing = read_library_from_disk();
     existing.retain(|t| !t.file_path.starts_with(&path));
     save_library_to_disk(&existing)?;
+    remove_folder_from_settings(&path);
     Ok(existing)
 }
 

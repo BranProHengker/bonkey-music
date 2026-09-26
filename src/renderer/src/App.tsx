@@ -276,18 +276,34 @@ export default function App(): React.JSX.Element {
     }
   }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle, setIsQueueOpen, currentTime, duration, seek, toggleMute])
 
+  // ─── Save Settings Helper ───────────────────────────────────────────
+  const persistSettings = async (updates: Record<string, unknown>) => {
+    const settings = await window.api.loadSettings()
+    const updatedSettings = {
+      ...settings,
+      ...updates
+    }
+    await window.api.saveSettings(updatedSettings)
+  }
+
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
     async function loadData() {
       const settings = await window.api.loadSettings()
+      let currentFolder: string | null = null
+      let currentFolders: string[] = []
+
       if (settings) {
         if (typeof settings.libraryFolder === 'string') {
+          currentFolder = settings.libraryFolder
           setLibraryFolder(settings.libraryFolder)
         }
         if (Array.isArray(settings.libraryFolders)) {
-          setLibraryFolders(settings.libraryFolders as string[])
+          currentFolders = settings.libraryFolders as string[]
+          setLibraryFolders(currentFolders)
         } else if (typeof settings.libraryFolder === 'string') {
-          setLibraryFolders([settings.libraryFolder])
+          currentFolders = [settings.libraryFolder]
+          setLibraryFolders(currentFolders)
         }
         if (Array.isArray(settings.favorites)) {
           setFavorites(settings.favorites as string[])
@@ -306,30 +322,36 @@ export default function App(): React.JSX.Element {
       const lib = await window.api.loadLibrary()
       if (lib && Array.isArray(lib)) {
         setTracks(lib as TrackMeta[])
+        // Auto-recover folder from indexed tracks if settings was empty
+        if (!currentFolder && lib.length > 0 && lib[0]?.filePath) {
+          const firstPath = lib[0].filePath
+          const separator = firstPath.includes('/') ? '/' : '\\'
+          const folderPart = firstPath.substring(0, firstPath.lastIndexOf(separator))
+          if (folderPart) {
+            currentFolder = folderPart
+            if (!currentFolders.includes(folderPart)) {
+              currentFolders.push(folderPart)
+            }
+            setLibraryFolder(currentFolder)
+            setLibraryFolders(currentFolders)
+            await persistSettings({ libraryFolder: currentFolder, libraryFolders: currentFolders })
+          }
+        }
       }
     }
     loadData()
   }, [])
 
-  // ─── Save Settings Helper ───────────────────────────────────────────
-  const persistSettings = async (updates: Record<string, unknown>) => {
-    const settings = await window.api.loadSettings()
-    const updatedSettings = {
-      ...settings,
-      ...updates
-    }
-    await window.api.saveSettings(updatedSettings)
-  }
-
   // ─── Folder Selection & Scanning ────────────────────────────────────
   const handleSelectAndAddFolder = async () => {
     const folder = await window.api.selectFolder()
     if (folder) {
-      if (!libraryFolders.includes(folder)) {
-        const nextFolders = [...libraryFolders, folder]
-        setLibraryFolders(nextFolders)
-        setLibraryFolder(folder)
-      }
+      const nextFolders = libraryFolders.includes(folder)
+        ? libraryFolders
+        : [...libraryFolders, folder]
+      setLibraryFolders(nextFolders)
+      setLibraryFolder(folder)
+      await persistSettings({ libraryFolder: folder, libraryFolders: nextFolders })
       await handleScanFolder(folder)
     }
   }
@@ -346,6 +368,9 @@ export default function App(): React.JSX.Element {
         const settings = await window.api.loadSettings()
         if (settings && Array.isArray(settings.libraryFolders)) {
           setLibraryFolders(settings.libraryFolders as string[])
+        }
+        if (settings && typeof settings.libraryFolder === 'string') {
+          setLibraryFolder(settings.libraryFolder)
         }
       }
     } catch (err) {
@@ -397,9 +422,9 @@ export default function App(): React.JSX.Element {
         ? (settings.libraryFolders as string[])
         : []
       setLibraryFolders(folders)
-      if (libraryFolder === folderPath) {
-        setLibraryFolder(folders[0] || null)
-      }
+      const nextFolder = libraryFolder === folderPath ? (folders[0] || null) : libraryFolder
+      setLibraryFolder(nextFolder)
+      await persistSettings({ libraryFolder: nextFolder, libraryFolders: folders })
     } catch (err) {
       console.error('Failed to remove folder:', err)
     } finally {
@@ -437,12 +462,14 @@ export default function App(): React.JSX.Element {
       setTracks(clearedTracks)
       setLibraryFolder(null)
       setLibraryFolders([])
+      await persistSettings({ libraryFolder: null, libraryFolders: [] })
     } catch (err) {
       console.error('Failed to reset library:', err)
       // Fallback: clear the UI tracks anyway
       setTracks([])
       setLibraryFolder(null)
       setLibraryFolders([])
+      await persistSettings({ libraryFolder: null, libraryFolders: [] })
     } finally {
       setIsScanning(false)
     }
@@ -1016,7 +1043,7 @@ export default function App(): React.JSX.Element {
               </div>
             </div>
           </div>
-        ) : !libraryFolder ? (
+        ) : (!libraryFolder && tracks.length === 0) ? (
           /* Empty Library / Init State */
           <div className="empty-state">
             <div className="empty-state-icon">

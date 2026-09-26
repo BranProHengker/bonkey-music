@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 
-fn get_settings_file_path() -> PathBuf {
+pub fn get_settings_file_path() -> PathBuf {
     crate::commands::library::get_app_dir().join("settings.json")
 }
 

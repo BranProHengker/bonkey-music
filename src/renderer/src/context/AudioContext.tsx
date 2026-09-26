@@ -1,5 +1,34 @@
 import { createContext, useState, useEffect, useRef } from 'react'
 
+// ─── Shuffle Helpers ──────────────────────────────────────────────────
+function fisherYates<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+function genreClusterShuffle(tracks: TrackMeta[], anchorGenre: string | null): TrackMeta[] {
+  const genreMap = new Map<string, TrackMeta[]>()
+  for (const track of tracks) {
+    const g = track.genre || 'Unknown'
+    if (!genreMap.has(g)) genreMap.set(g, [])
+    genreMap.get(g)!.push(track)
+  }
+
+  const anchorKey = anchorGenre || 'Unknown'
+  const otherKeys = fisherYates(Array.from(genreMap.keys()).filter((k) => k !== anchorKey))
+  const orderedKeys = genreMap.has(anchorKey) ? [anchorKey, ...otherKeys] : otherKeys
+
+  const result: TrackMeta[] = []
+  for (const key of orderedKeys) {
+    result.push(...fisherYates(genreMap.get(key)!))
+  }
+  return result
+}
+
 export interface TrackMeta {
   filePath: string
   title: string
@@ -239,9 +268,9 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     if (tracksContext && tracksContext.length > 0) {
       setOriginalQueue(tracksContext)
       if (isShuffle) {
-        // Create shuffled queue excluding current track
+        // Create genre-clustered shuffled queue excluding current track
         const remaining = tracksContext.filter((t) => t.filePath !== track.filePath)
-        const shuffled = [...remaining].sort(() => Math.random() - 0.5)
+        const shuffled = genreClusterShuffle(remaining, track.genre)
         setQueue([track, ...shuffled])
       } else {
         const index = tracksContext.findIndex((t) => t.filePath === track.filePath)
@@ -376,9 +405,9 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     setIsShuffle(newShuffle)
 
     if (newShuffle && currentTrack) {
-      // Shuffle remaining tracks
+      // Genre-cluster shuffle remaining tracks
       const remaining = originalQueue.filter((t) => t.filePath !== currentTrack.filePath)
-      const shuffled = [...remaining].sort(() => Math.random() - 0.5)
+      const shuffled = genreClusterShuffle(remaining, currentTrack.genre)
       setQueue([currentTrack, ...shuffled])
     } else if (currentTrack) {
       // Restore sequential queue from current track onwards
@@ -468,7 +497,7 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }
 
-  // Shuffle Queue (shuffles everything except the current playing track, keeping it first)
+  // Shuffle Queue (genre-cluster shuffle, keeping current track first)
   const shuffleQueue = () => {
     setQueue((prev) => {
       if (prev.length <= 1) return prev
@@ -476,10 +505,10 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       if (currentTrackIndex !== -1) {
         const current = prev[currentTrackIndex]
         const rest = prev.filter((_, i) => i !== currentTrackIndex)
-        const shuffled = [...rest].sort(() => Math.random() - 0.5)
+        const shuffled = genreClusterShuffle(rest, current.genre)
         return [current, ...shuffled]
       } else {
-        return [...prev].sort(() => Math.random() - 0.5)
+        return genreClusterShuffle(prev, currentTrack?.genre ?? null)
       }
     })
   }
