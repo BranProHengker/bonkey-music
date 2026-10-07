@@ -30,6 +30,7 @@ interface PlayerBarProps {
   onToggleFavorite?: (filePath: string) => void
   onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
   onAddToNewPlaylist?: (track: TrackMeta) => void
+  onOpenNowPlaying?: () => void
 }
 
 function PlayerBar({
@@ -43,7 +44,8 @@ function PlayerBar({
   onAddToQueue,
   onToggleFavorite,
   onAddToPlaylist,
-  onAddToNewPlaylist
+  onAddToNewPlaylist,
+  onOpenNowPlaying
 }: PlayerBarProps) {
   const {
     currentTrack,
@@ -214,23 +216,13 @@ function PlayerBar({
 
   return (
     <div className="player-bar">
-      {/* Paling Kiri: Kontrol Playback */}
-      <div className="player-controls-left">
-        <button className="btn-control" onClick={prevTrack} title="Previous">
-          <SkipBack size={20} weight="light" />
-        </button>
-
-        <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
-          {isPlaying ? <Pause size={20} weight="fill" /> : <Play size={20} weight="fill" />}
-        </button>
-
-        <button className="btn-control" onClick={nextTrack} title="Next">
-          <SkipForward size={20} weight="light" />
-        </button>
-      </div>
-
-      {/* Kiri-Tengah: Informasi Lagu */}
-      <div className="player-track-info">
+      {/* 1. Kiri: Informasi Lagu */}
+      <div 
+        className="player-track-info" 
+        onClick={() => onOpenNowPlaying?.()} 
+        style={{ cursor: currentTrack ? 'pointer' : 'default' }}
+        title={currentTrack ? 'Click to open Now Playing' : undefined}
+      >
         <div className="player-art">
           {currentTrack?.coverArt ? (
             <img src={currentTrack.coverArt} alt="Cover Art" />
@@ -263,23 +255,12 @@ function PlayerBar({
 
         {currentTrack && (
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '4px' }}>
-            <button
-              className={`btn-player-action ${favorites?.includes(currentTrack.filePath) ? 'active' : ''}`}
-              onClick={() => onToggleFavorite && onToggleFavorite(currentTrack.filePath)}
-              title={favorites?.includes(currentTrack.filePath) ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
-              style={{
-                color: favorites?.includes(currentTrack.filePath) ? '#f43f5e' : 'var(--text-secondary)'
-              }}
-            >
-              <Heart size={20} weight={favorites?.includes(currentTrack.filePath) ? 'fill' : 'light'} />
-            </button>
-
             <button 
               className="btn-player-action" 
               onClick={() => setIsPlusMenuOpen((prev) => !prev)}
               title="Add / Actions"
             >
-              <PlusCircle size={20} weight="light" />
+              <PlusCircle size={18} weight="light" />
             </button>
 
             {isPlusMenuOpen && (
@@ -372,7 +353,22 @@ function PlayerBar({
         )}
       </div>
 
-      {/* Tengah: Progress Bar Inline */}
+      {/* 2. Kiri-Tengah: Kontrol Playback */}
+      <div className="player-controls-left">
+        <button className="btn-control" onClick={prevTrack} title="Previous">
+          <SkipBack size={18} weight="fill" />
+        </button>
+
+        <button className="btn-play-pause" onClick={handlePlayClick} title={isPlaying ? 'Pause' : 'Play'}>
+          {isPlaying ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}
+        </button>
+
+        <button className="btn-control" onClick={nextTrack} title="Next">
+          <SkipForward size={18} weight="fill" />
+        </button>
+      </div>
+
+      {/* 3. Tengah: Progress Bar Inline */}
       <div className="player-progress-middle">
         <span className="progress-time">{formatTime(displayTime)}</span>
         <div className="progress-container" onMouseDown={handleProgressMouseDown}>
@@ -385,28 +381,35 @@ function PlayerBar({
         <span className="progress-time">{formatTime(duration)}</span>
       </div>
 
-      {/* Kanan: Utilitas & Kontrol Volume */}
+      {/* 4. Kanan: Utilitas, Volume, Favorit & Modes */}
       <div className="player-utilities-right">
-        {currentTrack && (
-          <div className="player-audio-tech-details" title="Audio Quality Spec">
-            {getAudioTechDetailsString(currentTrack)}
-          </div>
+        {currentTrack && onToggleFavorite && (
+          <button
+            className={`btn-control btn-player-heart ${favorites?.includes(currentTrack.filePath) ? 'active' : ''}`}
+            onClick={() => onToggleFavorite(currentTrack.filePath)}
+            title={favorites?.includes(currentTrack.filePath) ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+            style={{
+              color: favorites?.includes(currentTrack.filePath) ? 'var(--color-favorite)' : undefined
+            }}
+          >
+            <Heart size={18} weight={favorites?.includes(currentTrack.filePath) ? 'fill' : 'bold'} />
+          </button>
         )}
-
-        <button
-          className={`btn-control ${isShuffle ? 'active' : ''}`}
-          onClick={toggleShuffle}
-          title="Shuffle"
-        >
-          <Shuffle size={18} weight="light" />
-        </button>
 
         <button
           className={`btn-control ${isRepeat !== 'off' ? 'active' : ''}`}
           onClick={toggleRepeat}
           title={`Repeat: ${isRepeat}`}
         >
-          <Repeat size={18} weight="light" />
+          <Repeat size={18} weight={isRepeat !== 'off' ? 'bold' : 'regular'} />
+        </button>
+
+        <button
+          className={`btn-control ${isShuffle ? 'active' : ''}`}
+          onClick={toggleShuffle}
+          title="Shuffle"
+        >
+          <Shuffle size={18} weight={isShuffle ? 'bold' : 'regular'} />
         </button>
 
         {onToggleLyrics && (
@@ -415,7 +418,7 @@ function PlayerBar({
             onClick={onToggleLyrics}
             title="Lyrics"
           >
-            <ChatTeardropText size={20} weight="light" />
+            <ChatTeardropText size={18} weight="regular" />
           </button>
         )}
 
@@ -425,8 +428,14 @@ function PlayerBar({
             onClick={onToggleQueue}
             title="Queue"
           >
-            <List size={20} weight="light" />
+            <List size={18} weight="regular" />
           </button>
+        )}
+
+        {currentTrack && (
+          <div className="player-audio-tech-details" title="Audio Quality Spec">
+            {getAudioTechDetailsString(currentTrack)}
+          </div>
         )}
 
         <div className="volume-control">

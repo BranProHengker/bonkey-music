@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Heart, MusicNotes, Disc, Play, Pause, CaretRight, Headphones } from '@phosphor-icons/react'
+import { Heart, MusicNotes, Disc, Play, Pause, CaretRight, Headphones, Plus } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 import { useAudioEngine } from '../hooks/useAudioEngine'
 
@@ -12,20 +12,30 @@ interface AlbumGroup {
 
 interface PlaylistGridProps {
   albums: AlbumGroup[]
+  playlists?: string[]
+  playlistTracks?: Record<string, string[]>
+  playlistCovers?: Record<string, string>
   favoritesCount: number
   totalTracksCount: number
   totalArtistsCount: number
   onSelectAlbum: (albumName: string | null) => void
+  onSelectPlaylist?: (playlistName: string) => void
+  onCreatePlaylist?: () => void
   onSelectFavorites: () => void
   onSelectAllSongs: () => void
 }
 
 export default function PlaylistGrid({
   albums,
+  playlists = [],
+  playlistTracks = {},
+  playlistCovers = {},
   favoritesCount,
   totalTracksCount,
   totalArtistsCount,
   onSelectAlbum,
+  onSelectPlaylist,
+  onCreatePlaylist,
   onSelectFavorites,
   onSelectAllSongs
 }: PlaylistGridProps) {
@@ -148,6 +158,103 @@ export default function PlaylistGrid({
           <span>View All Tracks</span>
           <CaretRight size={13} weight="bold" />
         </button>
+      </div>
+
+      {/* ─── Playlists Showcase Grid ─── */}
+      <div className="playlists-section" style={{ marginBottom: '32px' }}>
+        <div className="section-header-row" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <h2 className="section-heading" style={{ margin: 0 }}>Playlists</h2>
+            <span className="section-count">{playlists.length} playlists</span>
+          </div>
+          {onCreatePlaylist && (
+            <button className="btn-secondary" onClick={onCreatePlaylist} style={{ padding: '6px 14px', fontSize: '12px' }}>
+              <Plus size={14} weight="bold" />
+              <span>Create Playlist</span>
+            </button>
+          )}
+        </div>
+
+        <div className="albums-grid">
+          {onCreatePlaylist && (
+            <div
+              className="album-card create-playlist-card"
+              onClick={onCreatePlaylist}
+              role="button"
+              tabIndex={0}
+              style={{
+                border: '1px dashed rgba(255, 255, 255, 0.15)',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                alignItems: 'center',
+                minHeight: '200px',
+                cursor: 'pointer',
+                background: 'rgba(255, 255, 255, 0.02)'
+              }}
+            >
+              <div
+                style={{
+                  width: '52px',
+                  height: '52px',
+                  borderRadius: '50%',
+                  background: 'var(--accent)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  marginBottom: '12px',
+                  boxShadow: '0 4px 14px rgba(225, 29, 72, 0.35)'
+                }}
+              >
+                <Plus size={24} weight="bold" />
+              </div>
+              <h3 style={{ fontSize: '14px', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>New Playlist</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)', margin: '4px 0 0 0' }}>Create custom mix</p>
+            </div>
+          )}
+
+          {playlists.map((playlist) => {
+            const trackCount = playlistTracks[playlist]?.length || 0
+            const coverArt = playlistCovers[playlist]
+            return (
+              <div
+                key={playlist}
+                className="album-card playlist-card"
+                onClick={() => onSelectPlaylist && onSelectPlaylist(playlist)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    onSelectPlaylist && onSelectPlaylist(playlist)
+                  }
+                }}
+              >
+                <div className="album-artwork-wrap">
+                  {coverArt ? (
+                    <img src={coverArt} alt={playlist} className="album-artwork" loading="lazy" />
+                  ) : (
+                    <div className="album-artwork-placeholder" style={{ background: 'linear-gradient(135deg, #1e2230 0%, #11141e 100%)' }}>
+                      <MusicNotes size={32} weight="light" color="var(--accent)" />
+                    </div>
+                  )}
+                </div>
+
+                <div className="album-meta">
+                  <h3 className="album-title" title={playlist}>
+                    {playlist}
+                  </h3>
+                  <p className="album-artist" style={{ color: 'var(--accent)' }}>
+                    Playlist
+                  </p>
+                  <span className="album-tracks-count">
+                    {trackCount} {trackCount === 1 ? 'track' : 'tracks'}
+                  </span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
       </div>
 
       {/* ─── Albums Showcase Grid ─── */}

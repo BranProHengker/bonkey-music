@@ -23,7 +23,9 @@ import PlaylistGrid from './components/PlaylistGrid'
 import PlayerBar from './components/PlayerBar'
 import QueuePanel from './components/QueuePanel'
 import LyricsView from './components/LyricsView'
+import NowPlayingView from './components/NowPlayingView'
 import StudioHub from './components/studio/StudioHub'
+import DashboardHome from './components/DashboardHome'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
 
 interface AlbumGroup {
@@ -39,7 +41,9 @@ export default function App(): React.JSX.Element {
     playTrack,
     currentTrack,
     isPlaying,
+    duration,
     volume,
+    isMuted,
     changeVolume,
     nextTrack,
     prevTrack,
@@ -57,10 +61,35 @@ export default function App(): React.JSX.Element {
     toggleMute
   } = useAudioEngine()
 
+  // ─── Theme State ─────────────────────────────────────────────────────
+  const [theme, setTheme] = useState<'lunio-dark' | 'studio-dark'>(() => {
+    try {
+      const saved = localStorage.getItem('bonkey_theme')
+      if (saved === 'dark' || saved === 'studio-dark') return 'studio-dark'
+      return 'lunio-dark'
+    } catch {
+      return 'lunio-dark'
+    }
+  })
+
+  useEffect(() => {
+    if (theme === 'lunio-dark') {
+      document.body.classList.add('theme-lunio')
+      document.body.classList.remove('theme-studio')
+    } else {
+      document.body.classList.remove('theme-lunio')
+      document.body.classList.add('theme-studio')
+    }
+    try {
+      localStorage.setItem('bonkey_theme', theme)
+    } catch {}
+  }, [theme])
+
   // ─── State ──────────────────────────────────────────────────────────
-  const [currentView, setCurrentView] = useState<'library' | 'favorites' | 'settings' | 'latest' | 'studio'>('library')
+  const [currentView, setCurrentView] = useState<'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'>('home')
   const [isQueueOpen, setIsQueueOpen] = useState(false)
   const [isLyricsOpen, setIsLyricsOpen] = useState(false)
+  const [isNowPlayingOpen, setIsNowPlayingOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
   const [libraryFolders, setLibraryFolders] = useState<string[]>([])
   const [tracks, setTracks] = useState<TrackMeta[]>([])
@@ -82,10 +111,10 @@ export default function App(): React.JSX.Element {
 
   // ─── Navigation History ──────────────────────────────────────────────
   const [history, setHistory] = useState<Array<{
-    currentView: 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
+    currentView: 'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
     activePlaylist: string | null
     activeAlbum: string | null
-  }>>([{ currentView: 'library', activePlaylist: null, activeAlbum: null }])
+  }>>([{ currentView: 'home', activePlaylist: null, activeAlbum: null }])
   const [historyIndex, setHistoryIndex] = useState(0)
   const [isNavigatingHistory, setIsNavigatingHistory] = useState(false)
 
@@ -811,6 +840,20 @@ export default function App(): React.JSX.Element {
     playTrack(track, displayedTracks)
   }
 
+  const handleSelectArtistFromDashboard = (artist: string) => {
+    setSearchQuery(artist)
+    setCurrentView('library')
+    setActivePlaylist(null)
+    setActiveAlbum(null)
+  }
+
+  const handleSelectAlbumFromDashboard = (album: string) => {
+    setActiveAlbum(album)
+    setCurrentView('library')
+    setActivePlaylist(null)
+    setSearchQuery('')
+  }
+
   // Go back to full library view when browsing specific album, playlist, or latest
   const handleClearFilters = () => {
     setActivePlaylist(null)
@@ -868,8 +911,8 @@ export default function App(): React.JSX.Element {
 
       {/* Main Panel */}
       <main className="main-content">
-        {/* Search Bar / Action Bar (Dedicated to local library, hidden in Music Studio) */}
-        {currentView !== 'studio' && (
+        {/* Search Bar / Action Bar (Dedicated to local library, hidden in Music Studio and clean Home view) */}
+        {currentView !== 'studio' && !(currentView === 'home' && !activeAlbum && !activePlaylist && !searchQuery) && (
           <div className="search-bar-container" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {(activeAlbum || activePlaylist || searchQuery || currentView === 'latest') && (
               <button
@@ -923,6 +966,39 @@ export default function App(): React.JSX.Element {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <h2 className="section-title">Settings</h2>
             
+            <div className="settings-section">
+              <div className="settings-row">
+                <div className="settings-label">
+                  <span className="settings-title">Appearance Theme</span>
+                  <span className="settings-subtitle">Choose between the modern Dark Lunio crimson design or classic studio dark mode.</span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className={`btn-secondary ${theme === 'lunio-dark' ? 'active' : ''}`}
+                    onClick={() => setTheme('lunio-dark')}
+                    style={{
+                      background: theme === 'lunio-dark' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.05)',
+                      color: '#ffffff',
+                      border: theme === 'lunio-dark' ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)'
+                    }}
+                  >
+                    Dark Lunio (Modern)
+                  </button>
+                  <button
+                    className={`btn-secondary ${theme === 'studio-dark' ? 'active' : ''}`}
+                    onClick={() => setTheme('studio-dark')}
+                    style={{
+                      background: theme === 'studio-dark' ? '#27272a' : 'rgba(255, 255, 255, 0.05)',
+                      color: '#ffffff',
+                      border: theme === 'studio-dark' ? '1px solid #52525b' : '1px solid rgba(255, 255, 255, 0.12)'
+                    }}
+                  >
+                    Studio Dark (Classic)
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <div className="settings-section">
               <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
                 <div className="settings-label">
@@ -1075,6 +1151,17 @@ export default function App(): React.JSX.Element {
               <span>Select Music Folder</span>
             </button>
           </div>
+        ) : (currentView === 'home' && !activePlaylist && !activeAlbum && !searchQuery) ? (
+          <DashboardHome
+            tracks={tracks}
+            albums={albums}
+            onPlayTrack={handlePlayTrack}
+            onSelectArtist={handleSelectArtistFromDashboard}
+            onSelectAlbum={handleSelectAlbumFromDashboard}
+            onNavigateToLibrary={() => setCurrentView('library')}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+          />
         ) : (
           /* Dashboard or Track List Views */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
@@ -1203,10 +1290,18 @@ export default function App(): React.JSX.Element {
             {currentView === 'library' && !activeAlbum && !activePlaylist && !searchQuery && (
               <PlaylistGrid
                 albums={albums}
+                playlists={playlists}
+                playlistTracks={playlistTracks}
+                playlistCovers={playlistCovers}
                 favoritesCount={favorites.length}
                 totalTracksCount={tracks.length}
                 totalArtistsCount={totalArtistsCount}
                 onSelectAlbum={(name) => setActiveAlbum(name)}
+                onSelectPlaylist={(name) => {
+                  setActivePlaylist(name)
+                  setActiveAlbum(null)
+                }}
+                onCreatePlaylist={handleCreatePlaylist}
                 onSelectFavorites={() => setCurrentView('favorites')}
                 onSelectAllSongs={() => setSearchQuery(' ')} // triggers displaying list view with space filter (resets to lists)
               />
@@ -1366,6 +1461,35 @@ export default function App(): React.JSX.Element {
           onClose={() => setIsLyricsOpen(false)}
           isQueueOpen={isQueueOpen}
           onCloseQueue={() => setIsQueueOpen(false)}
+          onSwitchToNowPlaying={() => {
+            setIsLyricsOpen(false)
+            setIsNowPlayingOpen(true)
+          }}
+        />
+      )}
+
+      {/* Full Now Playing Screen (Body Lagu Mode) */}
+      {isNowPlayingOpen && (
+        <NowPlayingView
+          currentTrack={currentTrack}
+          isPlaying={isPlaying}
+          duration={duration}
+          volume={volume}
+          isMuted={isMuted}
+          onPlayPause={togglePlay}
+          onNext={nextTrack}
+          onPrevious={prevTrack}
+          seek={seek}
+          onVolumeChange={changeVolume}
+          onToggleMute={toggleMute}
+          onClose={() => setIsNowPlayingOpen(false)}
+          onSwitchToLyrics={() => {
+            setIsNowPlayingOpen(false)
+            setIsLyricsOpen(true)
+          }}
+          onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
+          isQueueOpen={isQueueOpen}
+          sourceTitle={activePlaylist ? `Playing from ${activePlaylist}` : 'Playing from Queue'}
         />
       )}
 
@@ -1373,7 +1497,10 @@ export default function App(): React.JSX.Element {
       <PlayerBar
         onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
         isQueueOpen={isQueueOpen}
-        onToggleLyrics={() => setIsLyricsOpen((prev) => !prev)}
+        onToggleLyrics={() => {
+          setIsNowPlayingOpen(false)
+          setIsLyricsOpen((prev) => !prev)
+        }}
         isLyricsOpen={isLyricsOpen}
         displayedTracks={displayedTracks}
         playlists={playlists}
@@ -1382,6 +1509,10 @@ export default function App(): React.JSX.Element {
         onToggleFavorite={handleToggleFavorite}
         onAddToPlaylist={handleAddToPlaylist}
         onAddToNewPlaylist={handleCreatePlaylist}
+        onOpenNowPlaying={() => {
+          setIsLyricsOpen(false)
+          setIsNowPlayingOpen(true)
+        }}
       />
 
       {/* Create New Playlist Custom Modal */}

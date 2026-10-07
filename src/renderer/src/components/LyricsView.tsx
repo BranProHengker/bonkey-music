@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo, useCallback, memo, forwardRef } from 'react'
-import { MusicNotes, X, SidebarSimple, CloudArrowDown, ArrowClockwise } from '@phosphor-icons/react'
+import { MusicNotes, X, CloudArrowDown, ArrowClockwise, DotsThree } from '@phosphor-icons/react'
 import { TrackMeta, useAudioTime } from '../hooks/useAudioEngine'
 
 interface LyricLine {
@@ -16,6 +16,7 @@ interface LyricsViewProps {
   onClose: () => void
   isQueueOpen?: boolean
   onCloseQueue?: () => void
+  onSwitchToNowPlaying?: () => void
 }
 
 interface LyricLineItemProps {
@@ -54,7 +55,8 @@ function LyricsView({
   seek,
   onClose,
   isQueueOpen = false,
-  onCloseQueue
+  onCloseQueue,
+  onSwitchToNowPlaying
 }: LyricsViewProps): React.JSX.Element {
   const hookTime = useAudioTime()
   const currentTime = propCurrentTime !== undefined ? propCurrentTime : hookTime
@@ -62,27 +64,20 @@ function LyricsView({
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
   const [onlineSearchNotice, setOnlineSearchNotice] = useState<string | null>(null)
 
-  // Persistent user preference for manual cover visibility
-  const [userCoverHidden, setUserCoverHidden] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem('bonkey_lyrics_hide_cover') === 'true'
-    } catch {
-      return false
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    if (!isMenuOpen) return
+    const handleDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.lyrics-options-wrapper')) {
+        setIsMenuOpen(false)
+      }
     }
-  })
-
-  // Cover is hidden either if user manually hid it, or automatically when Queue is opened
-  const isCoverHidden = userCoverHidden || isQueueOpen
-
-  const handleToggleCover = () => {
-    setUserCoverHidden((prev) => {
-      const next = !prev
-      try {
-        localStorage.setItem('bonkey_lyrics_hide_cover', String(next))
-      } catch {}
-      return next
-    })
-  }
+    document.addEventListener('click', handleDocClick)
+    return () => document.removeEventListener('click', handleDocClick)
+  }, [isMenuOpen])
 
   const containerRef = useRef<HTMLDivElement>(null)
   const plainContainerRef = useRef<HTMLDivElement>(null)
@@ -320,11 +315,11 @@ function LyricsView({
       const activeHeight = activeLine.offsetHeight
       const containerHeight = container.clientHeight
 
-      // Center the active line perfectly in view
-      const targetCenter = containerHeight / 2 - (activeTop + activeHeight / 2)
+      // Eye-level karaoke reading: active line at ~32% from top of container
+      const targetCenter = containerHeight * 0.32 - (activeTop + activeHeight / 2)
       setTargetTranslateY(targetCenter)
     }
-  }, [isSyncedActive, activeIndex, isCoverHidden, isQueueOpen])
+  }, [isSyncedActive, activeIndex, isQueueOpen])
 
   // Keep center aligned during window resize
   useEffect(() => {
@@ -332,7 +327,7 @@ function LyricsView({
       if (!isSyncedActive || !containerRef.current || !activeLineRef.current) return
       const activeLine = activeLineRef.current
       const container = containerRef.current
-      const targetCenter = container.clientHeight / 2 - (activeLine.offsetTop + activeLine.offsetHeight / 2)
+      const targetCenter = container.clientHeight * 0.32 - (activeLine.offsetTop + activeLine.offsetHeight / 2)
       setTargetTranslateY(targetCenter)
     }
     window.addEventListener('resize', handleResize)
@@ -385,56 +380,107 @@ function LyricsView({
       />
       <div className="lyrics-darkener" />
 
-      {/* Action controls: Close (ESC) and Toggle Cover Art */}
-      <div className="lyrics-top-actions">
-        <button
-          className="lyrics-action-btn-circle"
-          onClick={onClose}
-          title="Close Lyrics (Esc)"
-          aria-label="Close Lyrics (Esc)"
+      {/* Top Navigation & Track Bar */}
+      <div className="lyrics-top-bar">
+        <div
+          className="lyrics-track-pill"
+          onClick={onSwitchToNowPlaying}
+          style={{ cursor: onSwitchToNowPlaying ? 'pointer' : 'default' }}
+          title={onSwitchToNowPlaying ? 'Switch to Now Playing (Cover View)' : undefined}
         >
-          <X size={18} weight="bold" />
-        </button>
-        <button
-          className={`lyrics-action-btn-circle ${userCoverHidden ? 'active' : ''}`}
-          onClick={handleToggleCover}
-          title={userCoverHidden ? 'Show Album Cover' : 'Hide Cover (Full Lyrics Mode)'}
-          aria-label={userCoverHidden ? 'Show Album Cover' : 'Hide Cover'}
-        >
-          <SidebarSimple size={18} weight={userCoverHidden ? 'fill' : 'bold'} />
-        </button>
+          {coverArtSrc ? (
+            <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-pill-thumb" />
+          ) : (
+            <div className="lyrics-pill-thumb-placeholder">
+              <MusicNotes size={18} weight="bold" />
+            </div>
+          )}
+          <div className="lyrics-pill-info">
+            <span className="lyrics-pill-title" title={currentTrack?.title}>
+              {currentTrack?.title || 'Unknown Title'}
+            </span>
+            <span className="lyrics-pill-artist" title={currentTrack?.artist}>
+              {currentTrack?.artist || 'Unknown Artist'}
+            </span>
+          </div>
+        </div>
+
+        <div className="lyrics-top-actions">
+          <div className="lyrics-options-wrapper">
+            <button
+              type="button"
+              className={`lyrics-action-btn-circle ${isMenuOpen ? 'active' : ''}`}
+              onClick={() => setIsMenuOpen((prev) => !prev)}
+              title="Lyrics Options"
+              aria-label="Lyrics Options"
+            >
+              <DotsThree size={22} weight="bold" />
+            </button>
+
+            {isMenuOpen && (
+              <div className="lyrics-dropdown-menu">
+                {onSwitchToNowPlaying && (
+                  <button
+                    type="button"
+                    className="lyrics-menu-item"
+                    onClick={() => {
+                      setIsMenuOpen(false)
+                      onSwitchToNowPlaying()
+                    }}
+                  >
+                    <MusicNotes size={16} weight="bold" />
+                    <span>Now Playing (Cover View)</span>
+                  </button>
+                )}
+
+                <button
+                  type="button"
+                  className="lyrics-menu-item"
+                  onClick={() => {
+                    handleSearchOnlineLyrics()
+                    setIsMenuOpen(false)
+                  }}
+                  disabled={isSearchingOnline}
+                >
+                  {isSearchingOnline ? (
+                    <ArrowClockwise size={16} className="animate-spin" />
+                  ) : (
+                    <CloudArrowDown size={16} weight="bold" />
+                  )}
+                  <span>{isSearchingOnline ? 'Searching LRCLIB...' : 'Search Lyrics Online (LRCLIB)'}</span>
+                </button>
+
+                {(currentTrack?.lossless || currentTrack?.container) && (
+                  <div className="lyrics-menu-info">
+                    <span>Format: {currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}</span>
+                    {currentTrack.bitsPerSample && currentTrack.sampleRate ? (
+                      <span style={{ fontSize: '11px', opacity: 0.7 }}>
+                        {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+
+                <div className="lyrics-menu-info">
+                  <span>Mode: {isSyncedActive ? 'Synced Karaoke (LRC)' : 'Plain Text Lyrics'}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className="lyrics-action-btn-circle"
+            onClick={onClose}
+            title="Close Lyrics (Esc)"
+            aria-label="Close Lyrics (Esc)"
+          >
+            <X size={18} weight="bold" />
+          </button>
+        </div>
       </div>
 
-      <div className={`lyrics-content-container ${isCoverHidden ? 'cover-hidden' : ''} ${isQueueOpen ? 'with-queue' : ''}`}>
-        {/* Left column: Responsive cover art and info (hidden in full lyrics mode) */}
-        {!isCoverHidden && (
-          <div className="lyrics-left-info">
-            <div className="lyrics-cover-wrapper">
-              {coverArtSrc ? (
-                <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-big-cover" />
-              ) : (
-                <div className="lyrics-big-cover-placeholder">
-                  <MusicNotes size={64} weight="thin" color="rgba(255,255,255,0.2)" />
-                </div>
-              )}
-            </div>
-            <div className="lyrics-track-meta">
-              <h1 className="lyrics-track-title" title={currentTrack?.title}>{currentTrack?.title || 'Unknown Title'}</h1>
-              <p className="lyrics-track-artist" title={currentTrack?.artist}>{currentTrack?.artist || 'Unknown Artist'}</p>
-              <p className="lyrics-track-album" title={currentTrack?.album}>{currentTrack?.album || 'Unknown Album'}</p>
-              {(currentTrack?.lossless || currentTrack?.container) && (
-                <div className="lyrics-spec-chip">
-                  <span>{currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase() || 'Audio'}</span>
-                  {currentTrack.bitsPerSample && currentTrack.sampleRate ? (
-                    <span className="spec-dot">• {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz</span>
-                  ) : null}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Right column: Lyrics view */}
+      <div className={`lyrics-content-container ${isQueueOpen ? 'with-queue' : ''}`}>
         <div
           className={`lyrics-right-list ${!isSyncedActive ? 'plain-mode' : ''}`}
           ref={isSyncedActive ? containerRef : plainContainerRef}
