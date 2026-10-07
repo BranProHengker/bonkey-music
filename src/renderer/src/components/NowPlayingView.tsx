@@ -21,9 +21,10 @@ import {
   RepeatOnce,
   PlusCircle,
   FolderOpen,
-  Link
+  Link,
+  Equals
 } from '@phosphor-icons/react'
-import { TrackMeta, useAudioTime } from '../hooks/useAudioEngine'
+import { TrackMeta, useAudioEngine, useAudioTime } from '../hooks/useAudioEngine'
 
 interface NowPlayingViewProps {
   currentTrack: TrackMeta | null
@@ -80,12 +81,11 @@ function NowPlayingView({
   onToggleMute,
   onClose,
   onSwitchToLyrics,
-  onToggleQueue,
   sourceTitle = 'Playing from Queue',
-  isShuffle = false,
-  onToggleShuffle,
-  isRepeat = 'off',
-  onToggleRepeat,
+  isShuffle: propShuffle,
+  onToggleShuffle: propToggleShuffle,
+  isRepeat: propRepeat,
+  onToggleRepeat: propToggleRepeat,
   isFavorite = false,
   onToggleFavorite,
   onAddToPlaylist,
@@ -93,6 +93,21 @@ function NowPlayingView({
   playlists = []
 }: NowPlayingViewProps): React.JSX.Element {
   const currentTime = useAudioTime()
+  const {
+    queue,
+    playTrack,
+    removeFromQueue,
+    isShuffle: engineShuffle,
+    toggleShuffle: engineToggleShuffle,
+    isRepeat: engineRepeat,
+    toggleRepeat: engineToggleRepeat
+  } = useAudioEngine()
+
+  const isShuffle = propShuffle ?? engineShuffle
+  const onToggleShuffle = propToggleShuffle || engineToggleShuffle
+  const isRepeat = propRepeat ?? engineRepeat
+  const onToggleRepeat = propToggleRepeat || engineToggleRepeat
+
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false)
   const [isPlaylistMenuOpen, setIsPlaylistMenuOpen] = useState<boolean>(false)
@@ -100,6 +115,7 @@ function NowPlayingView({
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
   const [isClosing, setIsClosing] = useState(false)
+  const [isBodyQueueOpen, setIsBodyQueueOpen] = useState(false)
 
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const isDraggingSheetRef = useRef(false)
@@ -367,15 +383,15 @@ function NowPlayingView({
       />
       <div className="lyrics-darkener" />
 
-      {/* Top Drag & Dismiss Zone (Covers top pill, header, and extends 20% below info text) */}
+      {/* Top Drag & Dismiss Zone */}
       <div
         className="now-playing-top-drag-zone"
         onMouseDown={(e) => {
-          if ((e.target as HTMLElement).closest('.now-playing-close-btn')) return
+          if ((e.target as HTMLElement).closest('.now-playing-top-actions')) return
           handleDragStart(e.clientY)
         }}
         onTouchStart={(e) => {
-          if ((e.target as HTMLElement).closest('.now-playing-close-btn')) return
+          if ((e.target as HTMLElement).closest('.now-playing-top-actions')) return
           handleDragStart(e.touches[0].clientY)
         }}
         onWheel={(e) => {
@@ -390,111 +406,12 @@ function NowPlayingView({
             <span>{sourceTitle}</span>
           </div>
 
-          <button
-            type="button"
-            className="now-playing-close-btn"
-            onClick={triggerClose}
-            title="Close (Esc)"
-            aria-label="Close"
-          >
-            <X size={18} weight="bold" />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Center Stage */}
-      <div className="now-playing-center-stage">
-        {/* Big Album Artwork */}
-        <div className="now-playing-cover-box">
-          {coverArtSrc ? (
-            <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-cover-img" />
-          ) : (
-            <div className="now-playing-cover-placeholder">
-              <MusicNotes size={80} weight="thin" color="rgba(255,255,255,0.25)" />
-            </div>
-          )}
-        </div>
-
-        {/* Track Metadata & Actions */}
-        <div className="now-playing-meta-row">
-          <div className="now-playing-text-group">
-            <h1 className="now-playing-title" title={currentTrack?.title}>
-              {currentTrack?.title || 'Unknown Title'}
-            </h1>
-            <p className="now-playing-artist" title={currentTrack?.artist}>
-              {currentTrack?.artist || 'Unknown Artist'}
-              {currentTrack?.album ? ` • ${currentTrack.album}` : ''}
-            </p>
-          </div>
-
-          <div className="now-playing-meta-actions">
-            {onToggleFavorite && (
-              <button
-                type="button"
-                className={`now-playing-action-icon-btn ${isFavorite ? 'favorite-active' : ''}`}
-                onClick={onToggleFavorite}
-                title={isFavorite ? 'Remove from Liked' : 'Like'}
-                aria-label="Like"
-              >
-                <Heart size={24} weight={isFavorite ? 'fill' : 'bold'} />
-              </button>
-            )}
-
-            {onAddToPlaylist && (
-              <div className="now-playing-playlist-wrapper" style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  className="now-playing-action-icon-btn"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setIsPlaylistMenuOpen((p) => !p)
-                    setIsMenuOpen(false)
-                  }}
-                  title="Add to Playlist"
-                  aria-label="Add to Playlist"
-                >
-                  <PlusCircle size={24} weight="bold" />
-                </button>
-
-                {isPlaylistMenuOpen && (
-                  <div className="now-playing-playlist-popup">
-                    <div className="now-playing-popup-header">Add to Playlist</div>
-                    {playlists.length === 0 ? (
-                      <div className="now-playing-popup-empty">No playlists yet</div>
-                    ) : (
-                      playlists.map((pl) => (
-                        <button
-                          key={pl}
-                          className="now-playing-popup-item"
-                          onClick={() => {
-                            if (currentTrack) onAddToPlaylist(pl, currentTrack)
-                            setIsPlaylistMenuOpen(false)
-                          }}
-                        >
-                          {pl}
-                        </button>
-                      ))
-                    )}
-                    {onAddToNewPlaylist && (
-                      <button
-                        className="now-playing-popup-item create-new"
-                        onClick={() => {
-                          if (currentTrack) onAddToNewPlaylist(currentTrack)
-                          setIsPlaylistMenuOpen(false)
-                        }}
-                      >
-                        + New Playlist
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
+          {/* Action Icons: More Options (...) & Close (X) placed in Top-Right Corner */}
+          <div className="now-playing-top-actions">
             <div className="now-playing-options-wrapper" style={{ position: 'relative' }}>
               <button
                 type="button"
-                className={`now-playing-option-btn ${isMenuOpen ? 'active' : ''}`}
+                className={`now-playing-action-icon-circle ${isMenuOpen ? 'active' : ''}`}
                 onClick={(e) => {
                   e.stopPropagation()
                   setIsMenuOpen((prev) => !prev)
@@ -508,6 +425,19 @@ function NowPlayingView({
 
               {isMenuOpen && (
                 <div className="track-dropdown-menu lyrics-dropdown-menu">
+                  {onAddToPlaylist && currentTrack && (
+                    <button
+                      type="button"
+                      className="dropdown-item"
+                      onClick={() => {
+                        setIsPlaylistMenuOpen((p) => !p)
+                      }}
+                    >
+                      <span className="dropdown-item-label">Add to Playlist</span>
+                      <PlusCircle size={16} weight="bold" className="dropdown-item-icon" />
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className="dropdown-item"
@@ -580,165 +510,464 @@ function NowPlayingView({
                   )}
                 </div>
               )}
-            </div>
-          </div>
-        </div>
 
-        {/* Live Active Lyric Snippet Pill (Clickable -> Switches to Full Lyrics) */}
-        <div
-          className="now-playing-lyric-pill"
-          onClick={onSwitchToLyrics}
-          title="Click to view full lyrics"
-        >
-          <span className="now-playing-lyric-text">
-            {activeLyricSnippet || (rawLyrics ? 'View Synced Lyrics' : 'Lyrics')}
-          </span>
-          <CaretRight size={14} weight="bold" className="now-playing-lyric-arrow" />
-        </div>
-
-        {/* Timeline Scrubber */}
-        <div className="now-playing-scrubber-box">
-          <div className="now-playing-progress-track" onMouseDown={handleProgressMouseDown}>
-            <div
-              className="now-playing-progress-fill"
-              style={{ width: `${progressPct}%` }}
-            />
-          </div>
-          <div className="now-playing-time-row">
-            <span>{formatTime(displayTime)}</span>
-            <span>{formatRemainingTime(displayTime, duration)}</span>
-          </div>
-        </div>
-
-        {/* Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat) */}
-        <div className="now-playing-controls-row">
-          <button
-            type="button"
-            className={`now-playing-mode-btn ${isShuffle ? 'active' : ''}`}
-            onClick={onToggleShuffle}
-            title={isShuffle ? 'Shuffle: On' : 'Shuffle: Off'}
-            aria-label="Shuffle"
-          >
-            <Shuffle size={22} weight={isShuffle ? 'bold' : 'regular'} />
-          </button>
-
-          <button
-            type="button"
-            className="now-playing-btn-ctrl"
-            onClick={onPrevious}
-            title="Previous (Ctrl+Left)"
-            aria-label="Previous"
-          >
-            <SkipBack size={32} weight="fill" />
-          </button>
-
-          <button
-            type="button"
-            className="now-playing-btn-play"
-            onClick={onPlayPause}
-            title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
-            aria-label={isPlaying ? 'Pause' : 'Play'}
-          >
-            {isPlaying ? (
-              <Pause size={28} weight="fill" />
-            ) : (
-              <Play size={28} weight="fill" style={{ marginLeft: '3px' }} />
-            )}
-          </button>
-
-          <button
-            type="button"
-            className="now-playing-btn-ctrl"
-            onClick={onNext}
-            title="Next (Ctrl+Right)"
-            aria-label="Next"
-          >
-            <SkipForward size={32} weight="fill" />
-          </button>
-
-          <button
-            type="button"
-            className={`now-playing-mode-btn ${isRepeat !== 'off' ? 'active' : ''}`}
-            onClick={onToggleRepeat}
-            title={`Repeat: ${isRepeat}`}
-            aria-label="Repeat"
-          >
-            {isRepeat === 'one' ? (
-              <RepeatOnce size={22} weight="bold" />
-            ) : (
-              <Repeat size={22} weight={isRepeat === 'all' ? 'bold' : 'regular'} />
-            )}
-          </button>
-        </div>
-
-        {/* Volume Slider Bar */}
-        <div className="now-playing-volume-row">
-          <button
-            type="button"
-            className="now-playing-vol-btn"
-            onClick={onToggleMute}
-            title={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted || effectiveVol === 0 ? (
-              <SpeakerX size={18} weight="bold" />
-            ) : (
-              <SpeakerLow size={18} weight="bold" />
-            )}
-          </button>
-
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.01"
-            value={effectiveVol}
-            onChange={handleVolumeChange}
-            className="now-playing-vol-slider"
-            title={`Volume: ${Math.round(effectiveVol * 100)}%`}
-          />
-
-          <button
-            type="button"
-            className="now-playing-vol-btn"
-            onClick={() => onVolumeChange(1)}
-            title="Max Volume"
-          >
-            <SpeakerHigh size={18} weight="bold" />
-          </button>
-        </div>
-
-        {/* Bottom Toolbar: Lyrics, Quality Spec & Queue */}
-        <div className="now-playing-bottom-toolbar">
-          <button
-            type="button"
-            className="now-playing-tool-btn"
-            onClick={onSwitchToLyrics}
-            title="Open Full Lyrics"
-          >
-            <ChatTeardropText size={22} weight="bold" />
-          </button>
-
-          {(currentTrack?.lossless || currentTrack?.container || currentTrack?.sampleRate) && (
-            <div className="now-playing-quality-badge" title="Audio Quality Specification">
-              <span>{currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}</span>
-              {currentTrack.bitsPerSample && currentTrack.sampleRate && (
-                <span style={{ opacity: 0.7, fontSize: '11px', marginLeft: '6px' }}>
-                  {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz
-                </span>
+              {/* Nested Playlist Sub-Popup */}
+              {isPlaylistMenuOpen && (
+                <div className="now-playing-playlist-popup">
+                  <div className="now-playing-popup-header">Add to Playlist</div>
+                  {playlists.length === 0 ? (
+                    <div className="now-playing-popup-empty">No playlists yet</div>
+                  ) : (
+                    playlists.map((pl) => (
+                      <button
+                        key={pl}
+                        className="now-playing-popup-item"
+                        onClick={() => {
+                          if (currentTrack) onAddToPlaylist?.(pl, currentTrack)
+                          setIsPlaylistMenuOpen(false)
+                          setIsMenuOpen(false)
+                        }}
+                      >
+                        {pl}
+                      </button>
+                    ))
+                  )}
+                  {onAddToNewPlaylist && (
+                    <button
+                      className="now-playing-popup-item create-new"
+                      onClick={() => {
+                        if (currentTrack) onAddToNewPlaylist(currentTrack)
+                        setIsPlaylistMenuOpen(false)
+                        setIsMenuOpen(false)
+                      }}
+                    >
+                      + New Playlist
+                    </button>
+                  )}
+                </div>
               )}
             </div>
-          )}
 
-          {onToggleQueue && (
             <button
               type="button"
-              className="now-playing-tool-btn"
-              onClick={onToggleQueue}
-              title="Playing Queue"
+              className="now-playing-action-icon-circle"
+              onClick={triggerClose}
+              title="Close (Esc)"
+              aria-label="Close"
             >
-              <ListBullets size={22} weight="bold" />
+              <X size={18} weight="bold" />
             </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Stage: Two-Column Split on Desktop, Adaptive on Narrow Screens */}
+      <div className={`now-playing-center-stage ${isBodyQueueOpen ? 'queue-mode-active' : ''}`}>
+        
+        {/* Responsive Mini Top Card (Visible only when Queue is active on narrow screens) */}
+        {isBodyQueueOpen && currentTrack && (
+          <div className="now-playing-responsive-mini-card">
+            <div className="mini-card-thumb">
+              {coverArtSrc ? (
+                <img src={coverArtSrc} alt={currentTrack.title} />
+              ) : (
+                <MusicNotes size={18} weight="light" />
+              )}
+            </div>
+            <div className="mini-card-info">
+              <span className="mini-card-title">{currentTrack.title}</span>
+              <span className="mini-card-artist">{currentTrack.artist || 'Unknown Artist'}</span>
+            </div>
+            <div className="mini-card-eq">
+              <span className="equalizer-bar bar-1" />
+              <span className="equalizer-bar bar-2" />
+              <span className="equalizer-bar bar-3" />
+            </div>
+          </div>
+        )}
+
+        <div className="now-playing-split-stage">
+          {/* Left Column: Big Album Artwork (Hidden in narrow mode when queue is open) */}
+          <div className="now-playing-art-col">
+            <div className="now-playing-art-wrapper">
+              {coverArtSrc ? (
+                <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-main-art" />
+              ) : (
+                <div className="now-playing-art-placeholder">
+                  <MusicNotes size={90} weight="thin" />
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column: Queue Mode vs Normal Controls Mode */}
+          {isBodyQueueOpen ? (
+            /* Queue Column (Image 1 Style) */
+            <div className="now-playing-queue-col">
+              <div className="now-playing-queue-header">
+                <h2 className="now-playing-queue-title">Queue</h2>
+              </div>
+
+              <div className="now-playing-queue-scrollable">
+                {/* Now Playing Section */}
+                <div className="now-playing-queue-section">
+                  <span className="now-playing-queue-section-label">Now playing</span>
+                  {currentTrack && (
+                    <div className="now-playing-queue-card active-card">
+                      <div className="queue-card-thumb">
+                        {coverArtSrc ? (
+                          <img src={coverArtSrc} alt={currentTrack.title} />
+                        ) : (
+                          <MusicNotes size={18} weight="light" />
+                        )}
+                      </div>
+                      <div className="queue-card-info">
+                        <span className="queue-card-title">{currentTrack.title}</span>
+                        <span className="queue-card-artist">{currentTrack.artist || 'Unknown Artist'}</span>
+                      </div>
+                      <div className="queue-card-eq-indicator">
+                        <span className="equalizer-bar bar-1" />
+                        <span className="equalizer-bar bar-2" />
+                        <span className="equalizer-bar bar-3" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Upcoming Queue Section */}
+                <div className="now-playing-queue-section">
+                  <div className="now-playing-queue-section-header">
+                    <span className="now-playing-queue-section-label">Next Up</span>
+                    <span className="now-playing-queue-count">{queue.length} songs</span>
+                  </div>
+
+                  {queue.length === 0 ? (
+                    <div className="now-playing-queue-empty">
+                      <span>Queue is empty</span>
+                      <p>Add songs from your library to keep the music playing</p>
+                    </div>
+                  ) : (
+                    <div className="now-playing-queue-list">
+                      {queue.map((item, qIdx) => (
+                        <div
+                          key={`${item.filePath}-${qIdx}`}
+                          className="now-playing-queue-row"
+                          onClick={() => playTrack(item, queue)}
+                          title="Click to play"
+                        >
+                          <div className="queue-row-drag-handle">
+                            <Equals size={16} weight="bold" />
+                          </div>
+                          <div className="queue-row-thumb">
+                            {item.coverArt ? (
+                              <img src={item.coverArt} alt={item.title} />
+                            ) : (
+                              <MusicNotes size={16} weight="light" />
+                            )}
+                          </div>
+                          <div className="queue-row-info">
+                            <span className="queue-row-title">{item.title}</span>
+                            <span className="queue-row-artist">{item.artist || 'Unknown Artist'}</span>
+                          </div>
+                          <button
+                            type="button"
+                            className="queue-row-remove-btn"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              removeFromQueue(item.filePath)
+                            }}
+                            title="Remove from queue"
+                          >
+                            <X size={15} weight="bold" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* Normal Controls Column (Image 2 Style) */
+            <div className="now-playing-info-col">
+              <div className="now-playing-source-tag">
+                <span>{sourceTitle}</span>
+              </div>
+
+              <div className="now-playing-track-headline">
+                <div className="headline-text">
+                  <h1 className="now-playing-headline-title" title={currentTrack?.title}>
+                    {currentTrack?.title || 'Unknown Title'}
+                  </h1>
+                  <p className="now-playing-headline-artist" title={currentTrack?.artist}>
+                    {currentTrack?.artist || 'Unknown Artist'}
+                    {currentTrack?.album ? ` • ${currentTrack.album}` : ''}
+                  </p>
+                </div>
+
+                {onToggleFavorite && (
+                  <button
+                    type="button"
+                    className={`now-playing-heart-btn ${isFavorite ? 'active' : ''}`}
+                    onClick={onToggleFavorite}
+                    title={isFavorite ? 'Remove from Liked' : 'Like'}
+                  >
+                    <Heart size={24} weight={isFavorite ? 'fill' : 'bold'} />
+                  </button>
+                )}
+              </div>
+
+              {/* Live Active Lyric Snippet Line (Clickable -> Switches to Full Lyrics) */}
+              <div
+                className="now-playing-lyric-snippet-bar"
+                onClick={onSwitchToLyrics}
+                title="Click to view full synced lyrics"
+              >
+                <MusicNotes size={15} weight="fill" className="lyric-snippet-note" />
+                <span className="lyric-snippet-text">
+                  {activeLyricSnippet || (rawLyrics ? 'View Synced Lyrics' : 'Lyrics')}
+                </span>
+                <CaretRight size={14} weight="bold" className="lyric-snippet-caret" />
+              </div>
+
+              {/* Scrubber Timeline */}
+              <div className="now-playing-scrubber-deck">
+                <div className="now-playing-progress-track" onMouseDown={handleProgressMouseDown}>
+                  <div
+                    className="now-playing-progress-fill"
+                    style={{ width: `${progressPct}%` }}
+                  />
+                </div>
+                <div className="now-playing-time-deck">
+                  <span>{formatTime(displayTime)}</span>
+                  <span>{formatRemainingTime(displayTime, duration)}</span>
+                </div>
+              </div>
+
+              {/* Playback Controls Deck: Skip Back, Play/Pause, Skip Forward */}
+              <div className="now-playing-deck-controls">
+                <button
+                  type="button"
+                  className="now-playing-ctrl-btn"
+                  onClick={onPrevious}
+                  title="Previous (Ctrl+Left)"
+                >
+                  <SkipBack size={32} weight="fill" />
+                </button>
+
+                <button
+                  type="button"
+                  className="now-playing-play-large-btn"
+                  onClick={onPlayPause}
+                  title={isPlaying ? 'Pause (Space)' : 'Play (Space)'}
+                >
+                  {isPlaying ? (
+                    <Pause size={28} weight="fill" />
+                  ) : (
+                    <Play size={28} weight="fill" style={{ marginLeft: '3px' }} />
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  className="now-playing-ctrl-btn"
+                  onClick={onNext}
+                  title="Next (Ctrl+Right)"
+                >
+                  <SkipForward size={32} weight="fill" />
+                </button>
+              </div>
+
+              {/* Volume Slider Deck */}
+              <div className="now-playing-volume-deck">
+                <button
+                  type="button"
+                  className="now-playing-deck-vol-btn"
+                  onClick={onToggleMute}
+                  title={isMuted ? 'Unmute' : 'Mute'}
+                >
+                  {isMuted || effectiveVol === 0 ? (
+                    <SpeakerX size={16} weight="bold" />
+                  ) : (
+                    <SpeakerLow size={16} weight="bold" />
+                  )}
+                </button>
+
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.01"
+                  value={effectiveVol}
+                  onChange={handleVolumeChange}
+                  className="now-playing-deck-slider"
+                  title={`Volume: ${Math.round(effectiveVol * 100)}%`}
+                />
+
+                <button
+                  type="button"
+                  className="now-playing-deck-vol-btn"
+                  onClick={() => onVolumeChange(1)}
+                  title="Max Volume"
+                >
+                  <SpeakerHigh size={16} weight="bold" />
+                </button>
+              </div>
+            </div>
           )}
+        </div>
+
+        {/* Responsive Compact Controls (Only on Narrow Screens when Queue is active) */}
+        {isBodyQueueOpen && (
+          <div className="now-playing-responsive-bottom-controls">
+            {/* Live Lyric Snippet Bar in Compact Mode */}
+            <div
+              className="now-playing-lyric-snippet-bar compact"
+              onClick={onSwitchToLyrics}
+              title="Click to view full synced lyrics"
+            >
+              <MusicNotes size={14} weight="fill" className="lyric-snippet-note" />
+              <span className="lyric-snippet-text">
+                {activeLyricSnippet || (rawLyrics ? 'View Synced Lyrics' : 'Lyrics')}
+              </span>
+              <CaretRight size={13} weight="bold" className="lyric-snippet-caret" />
+            </div>
+
+            <div className="now-playing-scrubber-deck compact">
+              <div className="now-playing-progress-track" onMouseDown={handleProgressMouseDown}>
+                <div
+                  className="now-playing-progress-fill"
+                  style={{ width: `${progressPct}%` }}
+                />
+              </div>
+              <div className="now-playing-time-deck">
+                <span>{formatTime(displayTime)}</span>
+                <span>{formatRemainingTime(displayTime, duration)}</span>
+              </div>
+            </div>
+
+            <div className="now-playing-deck-controls compact">
+              <button
+                type="button"
+                className="now-playing-ctrl-btn"
+                onClick={onPrevious}
+                title="Previous"
+              >
+                <SkipBack size={26} weight="fill" />
+              </button>
+
+              <button
+                type="button"
+                className="now-playing-play-large-btn compact"
+                onClick={onPlayPause}
+                title={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <Pause size={24} weight="fill" />
+                ) : (
+                  <Play size={24} weight="fill" style={{ marginLeft: '2px' }} />
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="now-playing-ctrl-btn"
+                onClick={onNext}
+                title="Next"
+              >
+                <SkipForward size={26} weight="fill" />
+              </button>
+            </div>
+
+            <div className="now-playing-volume-deck compact">
+              <button
+                type="button"
+                className="now-playing-deck-vol-btn"
+                onClick={onToggleMute}
+                title={isMuted ? 'Unmute' : 'Mute'}
+              >
+                {isMuted || effectiveVol === 0 ? (
+                  <SpeakerX size={15} weight="bold" />
+                ) : (
+                  <SpeakerLow size={15} weight="bold" />
+                )}
+              </button>
+
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.01"
+                value={effectiveVol}
+                onChange={handleVolumeChange}
+                className="now-playing-deck-slider"
+                title={`Volume: ${Math.round(effectiveVol * 100)}%`}
+              />
+
+              <button
+                type="button"
+                className="now-playing-deck-vol-btn"
+                onClick={() => onVolumeChange(1)}
+                title="Max Volume"
+              >
+                <SpeakerHigh size={15} weight="bold" />
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Bottom Floating Pill Dock (Image 1 & 2 Style) */}
+        <div className="now-playing-dock-container">
+          <div className="now-playing-dock">
+            {/* Lyrics Button */}
+            <button
+              type="button"
+              className="now-playing-dock-btn"
+              onClick={onSwitchToLyrics}
+              title="View Full Synced Lyrics"
+            >
+              <ChatTeardropText size={19} weight="bold" />
+            </button>
+
+            {/* Center Segmented Group: Shuffle & Repeat */}
+            <div className="now-playing-dock-segmented">
+              <button
+                type="button"
+                className={`dock-seg-btn ${isShuffle ? 'active' : ''}`}
+                onClick={onToggleShuffle}
+                title={isShuffle ? 'Shuffle: On' : 'Shuffle: Off'}
+              >
+                <Shuffle size={16} weight={isShuffle ? 'bold' : 'regular'} />
+              </button>
+
+              <button
+                type="button"
+                className={`dock-seg-btn ${isRepeat !== 'off' ? 'active' : ''}`}
+                onClick={onToggleRepeat}
+                title={`Repeat: ${isRepeat}`}
+              >
+                {isRepeat === 'one' ? (
+                  <RepeatOnce size={16} weight="bold" />
+                ) : (
+                  <Repeat size={16} weight={isRepeat === 'all' ? 'bold' : 'regular'} />
+                )}
+              </button>
+            </div>
+
+            {/* Queue Toggle Button */}
+            <button
+              type="button"
+              className={`now-playing-dock-btn ${isBodyQueueOpen ? 'active' : ''}`}
+              onClick={() => setIsBodyQueueOpen((prev) => !prev)}
+              title={isBodyQueueOpen ? 'Close Queue' : 'Open Queue'}
+            >
+              <ListBullets size={19} weight="bold" />
+            </button>
+          </div>
+
+          <div className="now-playing-dock-caption">
+            {currentTrack?.lossless ? 'Lossless Hi-Fi • System default' : 'System default'}
+          </div>
         </div>
       </div>
     </div>

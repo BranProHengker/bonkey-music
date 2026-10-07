@@ -13,9 +13,10 @@ import {
   MusicNotes,
   Play,
   X,
-  ClockCounterClockwise
+  ClockCounterClockwise,
+  CheckSquare,
+  Square
 } from '@phosphor-icons/react'
-import iconApp from './assets/iconapp.png'
 
 import Sidebar from './components/Sidebar'
 import TrackList from './components/TrackList'
@@ -34,6 +35,13 @@ interface AlbumGroup {
   artist: string
   coverArt: string | null
   tracks: TrackMeta[]
+}
+
+function formatSeconds(secs: number): string {
+  if (isNaN(secs) || secs <= 0) return '0:00'
+  const m = Math.floor(secs / 60)
+  const s = Math.floor(secs % 60)
+  return `${m}:${s < 10 ? '0' : ''}${s}`
 }
 
 export default function App(): React.JSX.Element {
@@ -107,8 +115,9 @@ export default function App(): React.JSX.Element {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
   const [playlistSearch, setPlaylistSearch] = useState('')
   const [isCreatePlaylistOpen, setIsCreatePlaylistOpen] = useState(false)
-  const [playlistTrackPending, setPlaylistTrackPending] = useState<TrackMeta | null>(null)
   const [newPlaylistName, setNewPlaylistName] = useState('')
+  const [playlistModalSelectedTracks, setPlaylistModalSelectedTracks] = useState<Set<string>>(new Set())
+  const [playlistModalSearch, setPlaylistModalSearch] = useState('')
   const [playlistCovers, setPlaylistCovers] = useState<Record<string, string>>({})
 
   // ─── Navigation History ──────────────────────────────────────────────
@@ -524,14 +533,50 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  const modalFilteredTracks = useMemo(() => {
+    if (!playlistModalSearch.trim()) return tracks
+    const q = playlistModalSearch.toLowerCase()
+    return tracks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        t.artist.toLowerCase().includes(q) ||
+        t.album.toLowerCase().includes(q)
+    )
+  }, [tracks, playlistModalSearch])
+
   const handleCreatePlaylist = (track?: TrackMeta) => {
     setNewPlaylistName('')
+    setPlaylistModalSearch('')
     if (track) {
-      setPlaylistTrackPending(track)
+      setPlaylistModalSelectedTracks(new Set([track.filePath]))
     } else {
-      setPlaylistTrackPending(null)
+      setPlaylistModalSelectedTracks(new Set())
     }
     setIsCreatePlaylistOpen(true)
+  }
+
+  const handleToggleModalTrackSelect = (filePath: string) => {
+    setPlaylistModalSelectedTracks((prev) => {
+      const next = new Set(prev)
+      if (next.has(filePath)) {
+        next.delete(filePath)
+      } else {
+        next.add(filePath)
+      }
+      return next
+    })
+  }
+
+  const handleSelectAllFiltered = (filtered: TrackMeta[]) => {
+    setPlaylistModalSelectedTracks((prev) => {
+      const next = new Set(prev)
+      filtered.forEach((t) => next.add(t.filePath))
+      return next
+    })
+  }
+
+  const handleClearModalSelection = () => {
+    setPlaylistModalSelectedTracks(new Set())
   }
 
   const handleSubmitNewPlaylist = async () => {
@@ -546,11 +591,10 @@ export default function App(): React.JSX.Element {
     const nextPlaylists = [...playlists, trimmed]
     setPlaylists(nextPlaylists)
 
+    const selectedFilePaths = Array.from(playlistModalSelectedTracks)
     let nextPlaylistTracks = { ...playlistTracks }
-    if (playlistTrackPending) {
-      nextPlaylistTracks[trimmed] = [playlistTrackPending.filePath]
-      setPlaylistTracks(nextPlaylistTracks)
-    }
+    nextPlaylistTracks[trimmed] = selectedFilePaths
+    setPlaylistTracks(nextPlaylistTracks)
 
     await persistSettings({
       playlists: nextPlaylists,
@@ -559,8 +603,15 @@ export default function App(): React.JSX.Element {
 
     // Reset states and close modal
     setNewPlaylistName('')
+    setPlaylistModalSearch('')
+    setPlaylistModalSelectedTracks(new Set())
     setIsCreatePlaylistOpen(false)
-    setPlaylistTrackPending(null)
+
+    // Immediately navigate to the newly created playlist!
+    setActivePlaylist(trimmed)
+    setActiveAlbum(null)
+    setSearchQuery('')
+    setCurrentView('library')
   }
 
   const handleAddToPlaylist = async (playlistName: string, track: TrackMeta) => {
@@ -878,8 +929,7 @@ export default function App(): React.JSX.Element {
   return (
     <div className="app-container">
       {/* Draggable header bar */}
-      <header className="app-header" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <img src={iconApp} alt="App Icon" style={{ width: '18px', height: '18px', objectFit: 'contain' }} />
+      <header className="app-header">
         <div className="app-title">Bonkey Music</div>
       </header>
 
@@ -1539,18 +1589,23 @@ export default function App(): React.JSX.Element {
 
       {/* Create New Playlist Custom Modal */}
       {isCreatePlaylistOpen && (
-        <div className="modal-overlay" onClick={() => {
-          setIsCreatePlaylistOpen(false)
-          setPlaylistTrackPending(null)
-        }}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setIsCreatePlaylistOpen(false)
+            setPlaylistModalSelectedTracks(new Set())
+            setPlaylistModalSearch('')
+          }}
+        >
+          <div className="modal-content playlist-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Create New Playlist</h3>
-              <button 
-                className="btn-modal-close" 
+              <button
+                className="btn-modal-close"
                 onClick={() => {
                   setIsCreatePlaylistOpen(false)
-                  setPlaylistTrackPending(null)
+                  setPlaylistModalSelectedTracks(new Set())
+                  setPlaylistModalSearch('')
                 }}
               >
                 <X size={18} weight="light" />
@@ -1572,28 +1627,138 @@ export default function App(): React.JSX.Element {
                 }}
                 autoFocus
               />
-              {playlistTrackPending && (
-                <div className="modal-pending-info">
-                  <span>Adding song: <strong>{playlistTrackPending.title}</strong> by {playlistTrackPending.artist}</span>
+
+              {/* Song Selection Area */}
+              <div className="modal-song-picker-header">
+                <span className="modal-song-picker-label">Choose Songs from Library</span>
+                <span className="modal-song-picker-count">
+                  {playlistModalSelectedTracks.size}{' '}
+                  {playlistModalSelectedTracks.size === 1 ? 'song' : 'songs'} selected
+                </span>
+              </div>
+
+              <div className="modal-song-picker-search">
+                <div className="search-input-wrapper" style={{ height: '34px' }}>
+                  <MagnifyingGlass size={15} weight="light" />
+                  <input
+                    type="text"
+                    className="search-input"
+                    placeholder="Search song, artist, album..."
+                    value={playlistModalSearch}
+                    onChange={(e) => setPlaylistModalSearch(e.target.value)}
+                    style={{ fontSize: '12.5px' }}
+                  />
+                  {playlistModalSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setPlaylistModalSearch('')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                        display: 'flex',
+                        alignItems: 'center'
+                      }}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {tracks.length > 0 && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '6px' }}>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAllFiltered(modalFilteredTracks)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'var(--accent)',
+                      fontSize: '11px',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    Select All ({modalFilteredTracks.length})
+                  </button>
+                  {playlistModalSelectedTracks.size > 0 && (
+                    <button
+                      type="button"
+                      onClick={handleClearModalSelection}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--text-tertiary)',
+                        fontSize: '11px',
+                        cursor: 'pointer',
+                        padding: 0
+                      }}
+                    >
+                      Clear
+                    </button>
+                  )}
                 </div>
               )}
+
+              <div className="modal-song-picker-list">
+                {modalFilteredTracks.length === 0 ? (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--text-tertiary)', fontSize: '12.5px' }}>
+                    {tracks.length === 0 ? 'No songs in your library yet.' : 'No matching songs found.'}
+                  </div>
+                ) : (
+                  modalFilteredTracks.map((track) => {
+                    const isSelected = playlistModalSelectedTracks.has(track.filePath)
+                    return (
+                      <div
+                        key={track.filePath}
+                        className={`modal-song-picker-row ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleToggleModalTrackSelect(track.filePath)}
+                      >
+                        <div className="modal-song-checkbox">
+                          {isSelected ? (
+                            <CheckSquare size={18} weight="fill" color="var(--accent)" />
+                          ) : (
+                            <Square size={18} weight="light" />
+                          )}
+                        </div>
+                        <div className="modal-song-thumb">
+                          {track.coverArt ? (
+                            <img src={track.coverArt} alt={track.title} />
+                          ) : (
+                            <MusicNotes size={16} weight="light" color="var(--text-tertiary)" />
+                          )}
+                        </div>
+                        <div className="modal-song-info">
+                          <span className="modal-song-title">{track.title}</span>
+                          <span className="modal-song-artist">{track.artist || 'Unknown Artist'}</span>
+                        </div>
+                        <span className="modal-song-duration">{formatSeconds(track.duration)}</span>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
             </div>
             <div className="modal-footer">
-              <button 
-                className="btn-modal-cancel" 
+              <button
+                className="btn-modal-cancel"
                 onClick={() => {
                   setIsCreatePlaylistOpen(false)
-                  setPlaylistTrackPending(null)
+                  setPlaylistModalSelectedTracks(new Set())
+                  setPlaylistModalSearch('')
                 }}
               >
                 Cancel
               </button>
-              <button 
+              <button
                 className="btn-modal-submit"
                 onClick={handleSubmitNewPlaylist}
                 disabled={!newPlaylistName.trim()}
               >
-                Create
+                Create Playlist
               </button>
             </div>
           </div>
