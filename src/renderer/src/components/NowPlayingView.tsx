@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, memo } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback, memo } from 'react'
 import {
   MusicNotes,
   X,
@@ -14,7 +14,14 @@ import {
   DotsThree,
   CaretRight,
   CloudArrowDown,
-  ArrowClockwise
+  ArrowClockwise,
+  Heart,
+  Shuffle,
+  Repeat,
+  RepeatOnce,
+  PlusCircle,
+  FolderOpen,
+  Link
 } from '@phosphor-icons/react'
 import { TrackMeta, useAudioTime } from '../hooks/useAudioEngine'
 
@@ -35,6 +42,15 @@ interface NowPlayingViewProps {
   onToggleQueue?: () => void
   isQueueOpen?: boolean
   sourceTitle?: string
+  isShuffle?: boolean
+  onToggleShuffle?: () => void
+  isRepeat?: 'off' | 'one' | 'all'
+  onToggleRepeat?: () => void
+  isFavorite?: boolean
+  onToggleFavorite?: () => void
+  onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
+  onAddToNewPlaylist?: (track: TrackMeta) => void
+  playlists?: string[]
 }
 
 function formatTime(seconds: number): string {
@@ -65,39 +81,152 @@ function NowPlayingView({
   onClose,
   onSwitchToLyrics,
   onToggleQueue,
-  sourceTitle = 'Playing from Queue'
+  sourceTitle = 'Playing from Queue',
+  isShuffle = false,
+  onToggleShuffle,
+  isRepeat = 'off',
+  onToggleRepeat,
+  isFavorite = false,
+  onToggleFavorite,
+  onAddToPlaylist,
+  onAddToNewPlaylist,
+  playlists = []
 }: NowPlayingViewProps): React.JSX.Element {
   const currentTime = useAudioTime()
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false)
+  const [isPlaylistMenuOpen, setIsPlaylistMenuOpen] = useState<boolean>(false)
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
+  const [isClosing, setIsClosing] = useState(false)
+
+  const overlayRef = useRef<HTMLDivElement | null>(null)
+  const isDraggingSheetRef = useRef(false)
+  const dragStartYRef = useRef(0)
+  const currentDragYRef = useRef(0)
+
+  // Smooth slide-down trigger for close action (nutup laci)
+  const triggerClose = useCallback(() => {
+    if (isClosing) return
+    setIsClosing(true)
+    if (overlayRef.current) {
+      overlayRef.current.style.transition = 'transform 0.36s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease'
+      overlayRef.current.style.transform = 'translateY(100%)'
+      overlayRef.current.style.opacity = '0'
+    }
+    setTimeout(() => {
+      onClose()
+    }, 350)
+  }, [isClosing, onClose])
+
+  // Drag down sheet gesture handlers (pull down like a curtain)
+  const handleDragStart = useCallback((clientY: number) => {
+    isDraggingSheetRef.current = true
+    dragStartYRef.current = clientY
+    currentDragYRef.current = 0
+    if (overlayRef.current) {
+      overlayRef.current.style.transition = 'none'
+    }
+  }, [])
+
+  const handleDragMove = useCallback((clientY: number) => {
+    if (!isDraggingSheetRef.current || !overlayRef.current) return
+    const deltaY = clientY - dragStartYRef.current
+    currentDragYRef.current = deltaY
+
+    if (deltaY > 0) {
+      overlayRef.current.style.transform = `translateY(${deltaY}px)`
+      const progress = Math.min(1, deltaY / (window.innerHeight * 0.75))
+      overlayRef.current.style.opacity = `${Math.max(0.35, 1 - progress * 0.65)}`
+    } else {
+      overlayRef.current.style.transform = `translateY(${deltaY * 0.15}px)`
+    }
+  }, [])
+
+  const handleDragEnd = useCallback(() => {
+    if (!isDraggingSheetRef.current || !overlayRef.current) return
+    isDraggingSheetRef.current = false
+    const deltaY = currentDragYRef.current
+
+    if (deltaY > 50) {
+      // Ditarik sedikit ke bawah -> langsung meluncur mulus ke bawah seperti menutup laci
+      setIsClosing(true)
+      overlayRef.current.style.transition = 'transform 0.36s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.3s ease'
+      overlayRef.current.style.transform = 'translateY(100%)'
+      overlayRef.current.style.opacity = '0'
+      setTimeout(() => {
+        onClose()
+      }, 350)
+    } else {
+      // Spring back jika dilepas sebelum batas
+      overlayRef.current.style.transition = 'transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease'
+      overlayRef.current.style.transform = 'translateY(0)'
+      overlayRef.current.style.opacity = '1'
+    }
+  }, [onClose])
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (isDraggingSheetRef.current) handleDragMove(e.clientY)
+    }
+    const onMouseUp = () => {
+      if (isDraggingSheetRef.current) handleDragEnd()
+    }
+    const onTouchMove = (e: TouchEvent) => {
+      if (isDraggingSheetRef.current && e.touches[0]) handleDragMove(e.touches[0].clientY)
+    }
+    const onTouchEnd = () => {
+      if (isDraggingSheetRef.current) handleDragEnd()
+    }
+
+    window.addEventListener('mousemove', onMouseMove)
+    window.addEventListener('mouseup', onMouseUp)
+    window.addEventListener('touchmove', onTouchMove)
+    window.addEventListener('touchend', onTouchEnd)
+    return () => {
+      window.removeEventListener('mousemove', onMouseMove)
+      window.removeEventListener('mouseup', onMouseUp)
+      window.removeEventListener('touchmove', onTouchMove)
+      window.removeEventListener('touchend', onTouchEnd)
+    }
+  }, [handleDragMove, handleDragEnd])
 
   // Close with Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault()
-        onClose()
+        if (isMenuOpen) {
+          setIsMenuOpen(false)
+          return
+        }
+        if (isPlaylistMenuOpen) {
+          setIsPlaylistMenuOpen(false)
+          return
+        }
+        triggerClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
+  }, [triggerClose, isMenuOpen, isPlaylistMenuOpen])
 
   // Close dropdown on click outside
   useEffect(() => {
-    if (!isMenuOpen) return
+    if (!isMenuOpen && !isPlaylistMenuOpen) return
     const handleDocClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (!target.closest('.now-playing-options-wrapper')) {
+      if (isMenuOpen && !target.closest('.now-playing-options-wrapper')) {
         setIsMenuOpen(false)
       }
+      if (isPlaylistMenuOpen && !target.closest('.now-playing-playlist-wrapper')) {
+        setIsPlaylistMenuOpen(false)
+      }
     }
-    document.addEventListener('click', handleDocClick)
-    return () => document.removeEventListener('click', handleDocClick)
-  }, [isMenuOpen])
+    document.addEventListener('mousedown', handleDocClick)
+    return () => document.removeEventListener('mousedown', handleDocClick)
+  }, [isMenuOpen, isPlaylistMenuOpen])
 
   // Fetch lyrics when track changes to show active lyric snippet
   useEffect(() => {
@@ -227,7 +356,10 @@ function NowPlayingView({
   const effectiveVol = isMuted ? 0 : volume
 
   return (
-    <div className="now-playing-overlay">
+    <div
+      ref={overlayRef}
+      className={`now-playing-overlay ${isClosing ? 'closing' : ''}`}
+    >
       {/* Blurred background cover art */}
       <div
         className="lyrics-bg-blur"
@@ -235,21 +367,39 @@ function NowPlayingView({
       />
       <div className="lyrics-darkener" />
 
-      {/* Top Header Bar */}
-      <div className="now-playing-header">
-        <div className="now-playing-source-pill">
-          <span>{sourceTitle}</span>
-        </div>
+      {/* Top Drag & Dismiss Zone (Covers top pill, header, and extends 20% below info text) */}
+      <div
+        className="now-playing-top-drag-zone"
+        onMouseDown={(e) => {
+          if ((e.target as HTMLElement).closest('.now-playing-close-btn')) return
+          handleDragStart(e.clientY)
+        }}
+        onTouchStart={(e) => {
+          if ((e.target as HTMLElement).closest('.now-playing-close-btn')) return
+          handleDragStart(e.touches[0].clientY)
+        }}
+        onWheel={(e) => {
+          if (e.deltaY > 20) triggerClose()
+        }}
+        title="Klik tahan dan tarik ke bawah atau tekan Esc untuk menutup"
+      >
+        <div className="now-playing-drag-handle-pill" />
 
-        <button
-          type="button"
-          className="now-playing-close-btn"
-          onClick={onClose}
-          title="Close (Esc)"
-          aria-label="Close"
-        >
-          <X size={18} weight="bold" />
-        </button>
+        <div className="now-playing-header">
+          <div className="now-playing-source-pill">
+            <span>{sourceTitle}</span>
+          </div>
+
+          <button
+            type="button"
+            className="now-playing-close-btn"
+            onClick={triggerClose}
+            title="Close (Esc)"
+            aria-label="Close"
+          >
+            <X size={18} weight="bold" />
+          </button>
+        </div>
       </div>
 
       {/* Main Center Stage */}
@@ -265,7 +415,7 @@ function NowPlayingView({
           )}
         </div>
 
-        {/* Track Metadata & Options */}
+        {/* Track Metadata & Actions */}
         <div className="now-playing-meta-row">
           <div className="now-playing-text-group">
             <h1 className="now-playing-title" title={currentTrack?.title}>
@@ -273,57 +423,164 @@ function NowPlayingView({
             </h1>
             <p className="now-playing-artist" title={currentTrack?.artist}>
               {currentTrack?.artist || 'Unknown Artist'}
+              {currentTrack?.album ? ` • ${currentTrack.album}` : ''}
             </p>
           </div>
 
-          <div className="now-playing-options-wrapper">
-            <button
-              type="button"
-              className={`now-playing-option-btn ${isMenuOpen ? 'active' : ''}`}
-              onClick={() => setIsMenuOpen((prev) => !prev)}
-              title="More Options"
-              aria-label="More Options"
-            >
-              <DotsThree size={22} weight="bold" />
-            </button>
+          <div className="now-playing-meta-actions">
+            {onToggleFavorite && (
+              <button
+                type="button"
+                className={`now-playing-action-icon-btn ${isFavorite ? 'favorite-active' : ''}`}
+                onClick={onToggleFavorite}
+                title={isFavorite ? 'Remove from Liked' : 'Like'}
+                aria-label="Like"
+              >
+                <Heart size={24} weight={isFavorite ? 'fill' : 'bold'} />
+              </button>
+            )}
 
-            {isMenuOpen && (
-              <div className="lyrics-dropdown-menu">
+            {onAddToPlaylist && (
+              <div className="now-playing-playlist-wrapper" style={{ position: 'relative' }}>
                 <button
                   type="button"
-                  className="lyrics-menu-item"
-                  onClick={onSwitchToLyrics}
+                  className="now-playing-action-icon-btn"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setIsPlaylistMenuOpen((p) => !p)
+                    setIsMenuOpen(false)
+                  }}
+                  title="Add to Playlist"
+                  aria-label="Add to Playlist"
                 >
-                  <ChatTeardropText size={16} weight="bold" />
-                  <span>Full Synced Lyrics</span>
+                  <PlusCircle size={24} weight="bold" />
                 </button>
 
-                <button
-                  type="button"
-                  className="lyrics-menu-item"
-                  onClick={handleSearchOnline}
-                  disabled={isSearchingOnline}
-                >
-                  {isSearchingOnline ? (
-                    <ArrowClockwise size={16} className="animate-spin" />
-                  ) : (
-                    <CloudArrowDown size={16} weight="bold" />
-                  )}
-                  <span>Search Lyrics Online (LRCLIB)</span>
-                </button>
-
-                {(currentTrack?.lossless || currentTrack?.container) && (
-                  <div className="lyrics-menu-info">
-                    <span>Quality: {currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}</span>
-                    {currentTrack.bitsPerSample && currentTrack.sampleRate ? (
-                      <span style={{ fontSize: '11px', opacity: 0.7 }}>
-                        {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz
-                      </span>
-                    ) : null}
+                {isPlaylistMenuOpen && (
+                  <div className="now-playing-playlist-popup">
+                    <div className="now-playing-popup-header">Add to Playlist</div>
+                    {playlists.length === 0 ? (
+                      <div className="now-playing-popup-empty">No playlists yet</div>
+                    ) : (
+                      playlists.map((pl) => (
+                        <button
+                          key={pl}
+                          className="now-playing-popup-item"
+                          onClick={() => {
+                            if (currentTrack) onAddToPlaylist(pl, currentTrack)
+                            setIsPlaylistMenuOpen(false)
+                          }}
+                        >
+                          {pl}
+                        </button>
+                      ))
+                    )}
+                    {onAddToNewPlaylist && (
+                      <button
+                        className="now-playing-popup-item create-new"
+                        onClick={() => {
+                          if (currentTrack) onAddToNewPlaylist(currentTrack)
+                          setIsPlaylistMenuOpen(false)
+                        }}
+                      >
+                        + New Playlist
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             )}
+
+            <div className="now-playing-options-wrapper" style={{ position: 'relative' }}>
+              <button
+                type="button"
+                className={`now-playing-option-btn ${isMenuOpen ? 'active' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsMenuOpen((prev) => !prev)
+                  setIsPlaylistMenuOpen(false)
+                }}
+                title="More Options"
+                aria-label="More Options"
+              >
+                <DotsThree size={22} weight="bold" />
+              </button>
+
+              {isMenuOpen && (
+                <div className="track-dropdown-menu lyrics-dropdown-menu">
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => {
+                      onSwitchToLyrics()
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    <span className="dropdown-item-label">Full Synced Lyrics</span>
+                    <ChatTeardropText size={16} weight="bold" className="dropdown-item-icon" />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={handleSearchOnline}
+                    disabled={isSearchingOnline}
+                  >
+                    <span className="dropdown-item-label">Search Lyrics Online</span>
+                    {isSearchingOnline ? (
+                      <ArrowClockwise size={16} className="animate-spin dropdown-item-icon" />
+                    ) : (
+                      <CloudArrowDown size={16} weight="bold" className="dropdown-item-icon" />
+                    )}
+                  </button>
+
+                  <div className="dropdown-divider" />
+
+                  <button
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => {
+                      if (currentTrack) {
+                        const info = `${currentTrack.title} - ${currentTrack.artist || 'Unknown'}`
+                        navigator.clipboard?.writeText(info)
+                      }
+                      setIsMenuOpen(false)
+                    }}
+                  >
+                    <span className="dropdown-item-label">Copy Track Info</span>
+                    <Link size={16} weight="bold" className="dropdown-item-icon" />
+                  </button>
+
+                  {currentTrack?.filePath && !currentTrack.filePath.startsWith('http') && (
+                    <button
+                      type="button"
+                      className="dropdown-item"
+                      onClick={() => {
+                        window.api.openFileLocation(currentTrack.filePath)
+                        setIsMenuOpen(false)
+                      }}
+                    >
+                      <span className="dropdown-item-label">Show in File Manager</span>
+                      <FolderOpen size={16} weight="bold" className="dropdown-item-icon" />
+                    </button>
+                  )}
+
+                  {(currentTrack?.lossless || currentTrack?.container) && (
+                    <>
+                      <div className="dropdown-divider" />
+                      <div className="dropdown-spec-info">
+                        <span className="spec-title">Quality: {currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}</span>
+                        {currentTrack.bitsPerSample && currentTrack.sampleRate ? (
+                          <span className="spec-sub">
+                            {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz
+                          </span>
+                        ) : null}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -353,8 +610,18 @@ function NowPlayingView({
           </div>
         </div>
 
-        {/* Playback Controls (Previous, Play/Pause, Next) */}
+        {/* Playback Controls (Shuffle, Previous, Play/Pause, Next, Repeat) */}
         <div className="now-playing-controls-row">
+          <button
+            type="button"
+            className={`now-playing-mode-btn ${isShuffle ? 'active' : ''}`}
+            onClick={onToggleShuffle}
+            title={isShuffle ? 'Shuffle: On' : 'Shuffle: Off'}
+            aria-label="Shuffle"
+          >
+            <Shuffle size={22} weight={isShuffle ? 'bold' : 'regular'} />
+          </button>
+
           <button
             type="button"
             className="now-playing-btn-ctrl"
@@ -387,6 +654,20 @@ function NowPlayingView({
             aria-label="Next"
           >
             <SkipForward size={32} weight="fill" />
+          </button>
+
+          <button
+            type="button"
+            className={`now-playing-mode-btn ${isRepeat !== 'off' ? 'active' : ''}`}
+            onClick={onToggleRepeat}
+            title={`Repeat: ${isRepeat}`}
+            aria-label="Repeat"
+          >
+            {isRepeat === 'one' ? (
+              <RepeatOnce size={22} weight="bold" />
+            ) : (
+              <Repeat size={22} weight={isRepeat === 'all' ? 'bold' : 'regular'} />
+            )}
           </button>
         </div>
 
@@ -426,7 +707,7 @@ function NowPlayingView({
           </button>
         </div>
 
-        {/* Bottom Toolbar: Lyrics & Queue */}
+        {/* Bottom Toolbar: Lyrics, Quality Spec & Queue */}
         <div className="now-playing-bottom-toolbar">
           <button
             type="button"
@@ -436,6 +717,17 @@ function NowPlayingView({
           >
             <ChatTeardropText size={22} weight="bold" />
           </button>
+
+          {(currentTrack?.lossless || currentTrack?.container || currentTrack?.sampleRate) && (
+            <div className="now-playing-quality-badge" title="Audio Quality Specification">
+              <span>{currentTrack.lossless ? 'Lossless' : currentTrack.container?.toUpperCase()}</span>
+              {currentTrack.bitsPerSample && currentTrack.sampleRate && (
+                <span style={{ opacity: 0.7, fontSize: '11px', marginLeft: '6px' }}>
+                  {currentTrack.bitsPerSample}-bit / {(currentTrack.sampleRate / 1000).toFixed(1)} kHz
+                </span>
+              )}
+            </div>
+          )}
 
           {onToggleQueue && (
             <button

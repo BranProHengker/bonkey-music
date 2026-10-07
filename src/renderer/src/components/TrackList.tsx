@@ -1,5 +1,24 @@
-import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react'
-import { Play, SpeakerHigh, Heart, MusicNotes, Plus, DotsThree } from '@phosphor-icons/react'
+import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import {
+  Play,
+  SpeakerHigh,
+  Heart,
+  MusicNotes,
+  Plus,
+  DotsThree,
+  Queue,
+  ListPlus,
+  FolderPlus,
+  FolderOpen,
+  Info,
+  Link,
+  Trash,
+  CaretRight,
+  X,
+  ListBullets,
+  List,
+  GridFour
+} from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 function formatDuration(secs: number): string {
@@ -8,6 +27,8 @@ function formatDuration(secs: number): string {
   const s = Math.floor(secs % 60)
   return `${m}:${s < 10 ? '0' : ''}${s}`
 }
+
+type TrackViewMode = 'detailed' | 'compact' | 'grid'
 
 interface TrackListProps {
   tracks: TrackMeta[]
@@ -34,21 +55,14 @@ interface TrackRowProps {
   isCurrent: boolean
   isPlaying: boolean
   isLiked: boolean
-  isMenuOpen: boolean
-  playlists?: string[]
-  currentPlaylistName?: string | null
   canReorder: boolean
-  menuRef: React.RefObject<HTMLDivElement | null>
+  viewMode: 'detailed' | 'compact'
   onPlayTrack: (track: TrackMeta) => void
   onToggleFavorite: (filePath: string) => void
   onAddToQueue?: (track: TrackMeta) => void
-  onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
-  onAddToNewPlaylist?: (track: TrackMeta) => void
-  onRemoveFromPlaylist?: (track: TrackMeta) => void
   onReorderTracks?: (startIndex: number, endIndex: number) => void
-  onToggleMenu: (trackPath: string) => void
-  onCloseMenu: () => void
-  onContextMenu: (e: React.MouseEvent, trackPath: string) => void
+  onOpenMenu: (rect: DOMRect, track: TrackMeta) => void
+  onContextMenu: (e: React.MouseEvent, track: TrackMeta) => void
 }
 
 const TrackRow = memo(function TrackRow({
@@ -57,25 +71,18 @@ const TrackRow = memo(function TrackRow({
   isCurrent,
   isPlaying,
   isLiked,
-  isMenuOpen,
-  playlists = [],
-  currentPlaylistName,
   canReorder,
-  menuRef,
+  viewMode,
   onPlayTrack,
   onToggleFavorite,
   onAddToQueue,
-  onAddToPlaylist,
-  onAddToNewPlaylist,
-  onRemoveFromPlaylist,
   onReorderTracks,
-  onToggleMenu,
-  onCloseMenu,
+  onOpenMenu,
   onContextMenu
 }: TrackRowProps) {
   return (
     <div
-      className={`track-row ${isCurrent ? 'playing' : ''}`}
+      className={`track-row ${viewMode === 'detailed' ? 'detailed-row' : 'compact-row'} ${isCurrent ? 'playing' : ''}`}
       draggable={canReorder}
       onDragStart={(e) => {
         if (canReorder) {
@@ -110,7 +117,7 @@ const TrackRow = memo(function TrackRow({
         }
       }}
       onDoubleClick={() => onPlayTrack(track)}
-      onContextMenu={(e) => onContextMenu(e, track.filePath)}
+      onContextMenu={(e) => onContextMenu(e, track)}
     >
       <div className="track-number" style={{ display: 'flex', alignItems: 'center' }}>
         {isCurrent ? (
@@ -130,14 +137,36 @@ const TrackRow = memo(function TrackRow({
       </div>
 
       <div className="track-info-col">
-        <div className="track-thumbnail">
-          {track.coverArt ? (
-            <img src={track.coverArt} alt="Cover Art" />
-          ) : (
-            <MusicNotes size={16} weight="light" />
+        {viewMode === 'detailed' ? (
+          <div className="detailed-art-box">
+            {track.coverArt ? (
+              <img src={track.coverArt} alt="Cover Art" />
+            ) : (
+              <MusicNotes size={20} weight="light" />
+            )}
+            {isCurrent && isPlaying && (
+              <div className="track-equalizer-overlay">
+                <span className="equalizer-bar bar-1" />
+                <span className="equalizer-bar bar-2" />
+                <span className="equalizer-bar bar-3" />
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="track-thumbnail">
+            {track.coverArt ? (
+              <img src={track.coverArt} alt="Cover Art" />
+            ) : (
+              <MusicNotes size={16} weight="light" />
+            )}
+          </div>
+        )}
+        <div className="track-title-container">
+          <span className="track-title">{track.title}</span>
+          {viewMode === 'detailed' && track.lossless && (
+            <span className="spec-badge-inline">LOSSLESS</span>
           )}
         </div>
-        <span className="track-title">{track.title}</span>
       </div>
 
       <div className="track-artist-col">{track.artist}</div>
@@ -175,102 +204,118 @@ const TrackRow = memo(function TrackRow({
 
         <div className="track-options-container" style={{ position: 'relative' }}>
           <button
-            className={`btn-track-options ${isMenuOpen ? 'active' : ''}`}
+            className="btn-track-options"
             title="More Options"
             onClick={(e) => {
               e.stopPropagation()
-              onToggleMenu(track.filePath)
+              const rect = e.currentTarget.getBoundingClientRect()
+              onOpenMenu(rect, track)
             }}
           >
             <DotsThree size={18} weight="bold" />
           </button>
-
-          {isMenuOpen && (
-            <div className="track-dropdown-menu" ref={menuRef} onClick={(e) => e.stopPropagation()}>
-              {onAddToQueue && (
-                <button
-                  className="dropdown-item"
-                  onClick={() => {
-                    onAddToQueue(track)
-                    onCloseMenu()
-                  }}
-                >
-                  Add to Queue
-                </button>
-              )}
-
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  onToggleFavorite(track.filePath)
-                  onCloseMenu()
-                }}
-              >
-                {isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
-              </button>
-
-              {onAddToPlaylist && (
-                <div className="dropdown-submenu-trigger">
-                  <span>Add to Playlist</span>
-                  <span className="submenu-arrow">▶</span>
-                  <div className="dropdown-submenu">
-                    {onAddToNewPlaylist && (
-                      <>
-                        <button
-                          className="dropdown-item"
-                          style={{ color: 'var(--accent)', fontWeight: 'bold' }}
-                          onClick={() => {
-                            onAddToNewPlaylist(track)
-                            onCloseMenu()
-                          }}
-                        >
-                          ＋ New Playlist
-                        </button>
-                        {playlists.length > 0 && (
-                          <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                        )}
-                      </>
-                    )}
-                    {playlists.map((playlist) => (
-                      <button
-                        key={playlist}
-                        className="dropdown-item"
-                        onClick={() => {
-                          onAddToPlaylist(playlist, track)
-                          onCloseMenu()
-                        }}
-                      >
-                        {playlist}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  window.api.openFileLocation(track.filePath)
-                  onCloseMenu()
-                }}
-              >
-                Open File Location
-              </button>
-
-              {currentPlaylistName && onRemoveFromPlaylist && (
-                <button
-                  className="dropdown-item danger"
-                  onClick={() => {
-                    onRemoveFromPlaylist(track)
-                    onCloseMenu()
-                  }}
-                >
-                  Remove from Playlist
-                </button>
-              )}
-            </div>
-          )}
         </div>
+      </div>
+    </div>
+  )
+})
+
+interface TrackGridCardProps {
+  track: TrackMeta
+  isCurrent: boolean
+  isPlaying: boolean
+  isLiked: boolean
+  onPlayTrack: (track: TrackMeta) => void
+  onToggleFavorite: (filePath: string) => void
+  onOpenMenu: (rect: DOMRect, track: TrackMeta) => void
+  onContextMenu: (e: React.MouseEvent, track: TrackMeta) => void
+}
+
+const TrackGridCard = memo(function TrackGridCard({
+  track,
+  isCurrent,
+  isPlaying,
+  isLiked,
+  onPlayTrack,
+  onToggleFavorite,
+  onOpenMenu,
+  onContextMenu
+}: TrackGridCardProps) {
+  return (
+    <div
+      className={`track-grid-card ${isCurrent ? 'playing' : ''}`}
+      onDoubleClick={() => onPlayTrack(track)}
+      onContextMenu={(e) => onContextMenu(e, track)}
+    >
+      <div className="grid-card-art">
+        {track.coverArt ? (
+          <img src={track.coverArt} alt={track.title} />
+        ) : (
+          <div className="grid-card-placeholder">
+            <MusicNotes size={42} weight="light" />
+          </div>
+        )}
+
+        <button
+          type="button"
+          className="grid-card-play-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            onPlayTrack(track)
+          }}
+          title={isCurrent && isPlaying ? 'Pause' : 'Play'}
+        >
+          {isCurrent && isPlaying ? (
+            <SpeakerHigh size={20} weight="bold" />
+          ) : (
+            <Play size={20} weight="fill" style={{ marginLeft: '2px' }} />
+          )}
+        </button>
+
+        <button
+          type="button"
+          className={`grid-card-heart-btn ${isLiked ? 'active' : ''}`}
+          onClick={(e) => {
+            e.stopPropagation()
+            onToggleFavorite(track.filePath)
+          }}
+          title={isLiked ? 'Remove Favorite' : 'Favorite'}
+        >
+          <Heart size={15} weight={isLiked ? 'fill' : 'bold'} />
+        </button>
+
+        <button
+          type="button"
+          className="grid-card-options-btn"
+          onClick={(e) => {
+            e.stopPropagation()
+            const rect = e.currentTarget.getBoundingClientRect()
+            onOpenMenu(rect, track)
+          }}
+          title="More Options"
+        >
+          <DotsThree size={18} weight="bold" />
+        </button>
+
+        {isCurrent && isPlaying ? (
+          <div className="grid-card-eq-pill">
+            <span className="equalizer-bar bar-1" />
+            <span className="equalizer-bar bar-2" />
+            <span className="equalizer-bar bar-3" />
+          </div>
+        ) : (
+          <span className="grid-card-duration-badge">
+            {formatDuration(track.duration)}
+          </span>
+        )}
+      </div>
+
+      <div className="grid-card-meta">
+        <div className="grid-card-title-row">
+          <span className="grid-card-title" title={track.title}>{track.title}</span>
+          {track.lossless && <span className="spec-badge-inline mini">FLAC</span>}
+        </div>
+        <span className="grid-card-artist" title={track.artist}>{track.artist || 'Unknown Artist'}</span>
       </div>
     </div>
   )
@@ -294,56 +339,82 @@ function TrackList({
   currentPlaylistName = null,
   onReorderTracks
 }: TrackListProps) {
-  const [activeMenuTrack, setActiveMenuTrack] = useState<string | null>(null)
-  const menuRef = useRef<HTMLDivElement | null>(null)
+  const [viewMode, setViewMode] = useState<TrackViewMode>(() => {
+    try {
+      return (localStorage.getItem('bonkey_track_view') as TrackViewMode) || 'detailed'
+    } catch {
+      return 'detailed'
+    }
+  })
 
+  const handleChangeView = (mode: TrackViewMode) => {
+    setViewMode(mode)
+    try {
+      localStorage.setItem('bonkey_track_view', mode)
+    } catch {}
+  }
+
+  const [activeMenu, setActiveMenu] = useState<{
+    x: number
+    y: number
+    track: TrackMeta
+  } | null>(null)
+  const [copiedTrackId, setCopiedTrackId] = useState<string | null>(null)
+  const [detailsTrack, setDetailsTrack] = useState<TrackMeta | null>(null)
+
+  // Close floating menu on click outside or escape
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setActiveMenuTrack(null)
+    if (!activeMenu) return
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.track-dropdown-menu')) {
+        setActiveMenu(null)
       }
     }
-    if (activeMenuTrack) {
-      document.addEventListener('mousedown', handleClickOutside)
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setActiveMenu(null)
     }
+    document.addEventListener('mousedown', handleClickOutside)
+    window.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
+      window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [activeMenuTrack])
+  }, [activeMenu])
 
-  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; trackPath: string } | null>(null)
+  const handleOpenMenu = useCallback((rect: DOMRect, track: TrackMeta) => {
+    const menuWidth = 230
+    const menuHeight = 310
 
-  useEffect(() => {
-    function handleClickOutside() {
-      setContextMenu(null)
-    }
-    if (contextMenu) {
-      document.addEventListener('click', handleClickOutside)
-      document.addEventListener('contextmenu', handleClickOutside)
-    }
-    return () => {
-      document.removeEventListener('click', handleClickOutside)
-      document.removeEventListener('contextmenu', handleClickOutside)
-    }
-  }, [contextMenu])
+    let x = rect.right - menuWidth
+    if (x < 12) x = 12
+    if (x + menuWidth > window.innerWidth - 12) x = window.innerWidth - menuWidth - 12
 
-  const handleToggleMenu = useCallback((trackPath: string) => {
-    setActiveMenuTrack((prev) => (prev === trackPath ? null : trackPath))
+    let y = rect.bottom + 6
+    if (y + menuHeight > window.innerHeight - 16) {
+      y = Math.max(12, rect.top - menuHeight - 6)
+    }
+
+    setActiveMenu({ x, y, track })
   }, [])
 
-  const handleCloseMenu = useCallback(() => {
-    setActiveMenuTrack(null)
-  }, [])
-
-  const handleContextMenu = useCallback((e: React.MouseEvent, trackPath: string) => {
+  const handleContextMenu = useCallback((e: React.MouseEvent, track: TrackMeta) => {
     e.preventDefault()
     e.stopPropagation()
-    setContextMenu({
-      x: e.clientX,
-      y: e.clientY,
-      trackPath
-    })
-    setActiveMenuTrack(null)
+    const menuWidth = 230
+    const menuHeight = 310
+
+    let x = e.clientX
+    if (x + menuWidth > window.innerWidth - 12) {
+      x = Math.max(12, window.innerWidth - menuWidth - 12)
+    }
+
+    let y = e.clientY
+    if (y + menuHeight > window.innerHeight - 16) {
+      y = Math.max(12, e.clientY - menuHeight)
+    }
+
+    setActiveMenu({ x, y, track })
   }, [])
 
   const favoritesSet = useMemo(() => new Set(favorites), [favorites])
@@ -363,162 +434,340 @@ function TrackList({
 
   return (
     <div className="track-list-container">
-      <div className="track-list-header">
-        <div>#</div>
-        <div role="button" onClick={() => onSort?.('title')}>
-          Title{renderSortIndicator('title')}
+      {/* Top Toolbar: Track Count Badge & Segmented View Switcher */}
+      <div className="track-list-toolbar">
+        <div className="track-list-count-badge">
+          {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
         </div>
-        <div role="button" onClick={() => onSort?.('artist')}>
-          Artist{renderSortIndicator('artist')}
+
+        <div className="track-view-switcher">
+          <button
+            type="button"
+            className={`view-switcher-btn ${viewMode === 'detailed' ? 'active' : ''}`}
+            onClick={() => handleChangeView('detailed')}
+            title="Detailed List"
+          >
+            <ListBullets size={15} weight={viewMode === 'detailed' ? 'bold' : 'regular'} />
+            <span className="view-btn-label">Detailed</span>
+          </button>
+          <button
+            type="button"
+            className={`view-switcher-btn ${viewMode === 'compact' ? 'active' : ''}`}
+            onClick={() => handleChangeView('compact')}
+            title="Compact Table"
+          >
+            <List size={15} weight={viewMode === 'compact' ? 'bold' : 'regular'} />
+            <span className="view-btn-label">Compact</span>
+          </button>
+          <button
+            type="button"
+            className={`view-switcher-btn ${viewMode === 'grid' ? 'active' : ''}`}
+            onClick={() => handleChangeView('grid')}
+            title="Album Grid"
+          >
+            <GridFour size={15} weight={viewMode === 'grid' ? 'bold' : 'regular'} />
+            <span className="view-btn-label">Grid</span>
+          </button>
         </div>
-        <div role="button" onClick={() => onSort?.('album')}>
-          Album{renderSortIndicator('album')}
-        </div>
-        <div role="button" onClick={() => onSort?.('genre')}>
-          Genre{renderSortIndicator('genre')}
-        </div>
-        <div role="button" style={{ textAlign: 'right', justifyContent: 'flex-end' }} onClick={() => onSort?.('duration')}>
-          Time{renderSortIndicator('duration')}
-        </div>
-        <div style={{ justifySelf: 'center' }}>Actions</div>
       </div>
 
-      {tracks.map((track, index) => {
-        const isCurrent = currentTrack?.filePath === track.filePath
-        const isLiked = favoritesSet.has(track.filePath)
+      {/* Grid Mode */}
+      {viewMode === 'grid' ? (
+        <div className="track-grid-container">
+          {tracks.map((track) => {
+            const isCurrent = currentTrack?.filePath === track.filePath
+            const isLiked = favoritesSet.has(track.filePath)
+            return (
+              <TrackGridCard
+                key={track.filePath}
+                track={track}
+                isCurrent={isCurrent}
+                isPlaying={isCurrent ? isPlaying : false}
+                isLiked={isLiked}
+                onPlayTrack={onPlayTrack}
+                onToggleFavorite={onToggleFavorite}
+                onOpenMenu={handleOpenMenu}
+                onContextMenu={handleContextMenu}
+              />
+            )
+          })}
+        </div>
+      ) : (
+        <>
+          {/* Table Headers for Detailed & Compact Modes */}
+          <div className={`track-list-header ${viewMode === 'detailed' ? 'detailed-header' : 'compact-header'}`}>
+            <div>#</div>
+            <div role="button" onClick={() => onSort?.('title')}>
+              Title{renderSortIndicator('title')}
+            </div>
+            <div role="button" onClick={() => onSort?.('artist')}>
+              Artist{renderSortIndicator('artist')}
+            </div>
+            <div role="button" onClick={() => onSort?.('album')}>
+              Album{renderSortIndicator('album')}
+            </div>
+            <div role="button" onClick={() => onSort?.('genre')}>
+              Genre{renderSortIndicator('genre')}
+            </div>
+            <div role="button" style={{ textAlign: 'right', justifyContent: 'flex-end' }} onClick={() => onSort?.('duration')}>
+              Time{renderSortIndicator('duration')}
+            </div>
+            <div style={{ justifySelf: 'center' }}>Actions</div>
+          </div>
 
-        return (
-          <TrackRow
-            key={track.filePath}
-            track={track}
-            index={index}
-            isCurrent={isCurrent}
-            isPlaying={isCurrent ? isPlaying : false}
-            isLiked={isLiked}
-            isMenuOpen={activeMenuTrack === track.filePath}
-            playlists={playlists}
-            currentPlaylistName={currentPlaylistName}
-            canReorder={!!onReorderTracks}
-            menuRef={menuRef}
-            onPlayTrack={onPlayTrack}
-            onToggleFavorite={onToggleFavorite}
-            onAddToQueue={onAddToQueue}
-            onAddToPlaylist={onAddToPlaylist}
-            onAddToNewPlaylist={onAddToNewPlaylist}
-            onRemoveFromPlaylist={onRemoveFromPlaylist}
-            onReorderTracks={onReorderTracks}
-            onToggleMenu={handleToggleMenu}
-            onCloseMenu={handleCloseMenu}
-            onContextMenu={handleContextMenu}
-          />
-        )
-      })}
+          {tracks.map((track, index) => {
+            const isCurrent = currentTrack?.filePath === track.filePath
+            const isLiked = favoritesSet.has(track.filePath)
 
-      {contextMenu && (() => {
-        const track = tracks.find((t) => t.filePath === contextMenu.trackPath)
-        if (!track) return null
-        const isLiked = favorites.includes(track.filePath)
-        return (
-          <div
-            className="track-dropdown-menu context-menu"
-            style={{
-              position: 'fixed',
-              left: `${contextMenu.x}px`,
-              top: `${contextMenu.y}px`,
-              right: 'auto',
-              zIndex: 1000,
-              margin: 0
-            }}
-            onClick={(e) => e.stopPropagation()}
-            onContextMenu={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
+            return (
+              <TrackRow
+                key={track.filePath}
+                track={track}
+                index={index}
+                isCurrent={isCurrent}
+                isPlaying={isCurrent ? isPlaying : false}
+                isLiked={isLiked}
+                canReorder={!!onReorderTracks}
+                viewMode={viewMode}
+                onPlayTrack={onPlayTrack}
+                onToggleFavorite={onToggleFavorite}
+                onAddToQueue={onAddToQueue}
+                onReorderTracks={onReorderTracks}
+                onOpenMenu={handleOpenMenu}
+                onContextMenu={handleContextMenu}
+              />
+            )
+          })}
+        </>
+      )}
+
+      {/* Apple Music Style Floating Popover (Fixed, Never Clipped) */}
+      {activeMenu && (
+        <div
+          className="track-dropdown-menu track-floating-popover"
+          style={{
+            position: 'fixed',
+            left: `${activeMenu.x}px`,
+            top: `${activeMenu.y}px`,
+            zIndex: 99999
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Section 1: Playback Actions */}
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              onPlayTrack(activeMenu.track)
+              setActiveMenu(null)
             }}
           >
-            {onAddToQueue && (
-              <button
-                className="dropdown-item"
-                onClick={() => {
-                  onAddToQueue(track)
-                  setContextMenu(null)
-                }}
-              >
-                Add to Queue
-              </button>
-            )}
-            
+            <span className="dropdown-item-label">Play</span>
+            <Play size={16} weight="bold" className="dropdown-item-icon" />
+          </button>
+
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              if (onAddToQueue) onAddToQueue(activeMenu.track)
+              setActiveMenu(null)
+            }}
+          >
+            <span className="dropdown-item-label">Play Next</span>
+            <Queue size={16} weight="bold" className="dropdown-item-icon" />
+          </button>
+
+          {onAddToQueue && (
             <button
+              type="button"
               className="dropdown-item"
               onClick={() => {
-                onToggleFavorite(track.filePath)
-                setContextMenu(null)
+                onAddToQueue(activeMenu.track)
+                setActiveMenu(null)
               }}
             >
-              {isLiked ? 'Remove from Liked Songs' : 'Save to Liked Songs'}
+              <span className="dropdown-item-label">Add to Queue</span>
+              <ListPlus size={16} weight="bold" className="dropdown-item-icon" />
             </button>
+          )}
 
-            {onAddToPlaylist && (
-              <div className="dropdown-submenu-trigger">
-                <span>Add to Playlist</span>
-                <span className="submenu-arrow">▶</span>
-                <div className="dropdown-submenu">
-                  {onAddToNewPlaylist && (
-                    <>
-                      <button
-                        className="dropdown-item"
-                        style={{ color: 'var(--accent)', fontWeight: 'bold' }}
-                        onClick={() => {
-                          onAddToNewPlaylist(track)
-                          setContextMenu(null)
-                        }}
-                      >
-                        ＋ New Playlist
-                      </button>
-                      {playlists.length > 0 && (
-                        <div style={{ height: '1px', background: 'rgba(255,255,255,0.06)', margin: '4px 0' }} />
-                      )}
-                    </>
-                  )}
-                  {playlists.map((playlist) => (
+          <div className="dropdown-divider" />
+
+          {/* Section 2: Library & Playlists */}
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              onToggleFavorite(activeMenu.track.filePath)
+              setActiveMenu(null)
+            }}
+          >
+            <span className="dropdown-item-label">
+              {favoritesSet.has(activeMenu.track.filePath) ? 'Remove Favorite' : 'Favorite'}
+            </span>
+            <Heart
+              size={16}
+              weight={favoritesSet.has(activeMenu.track.filePath) ? 'fill' : 'bold'}
+              className={`dropdown-item-icon ${favoritesSet.has(activeMenu.track.filePath) ? 'heart-filled' : ''}`}
+            />
+          </button>
+
+          {onAddToPlaylist && (
+            <div className="dropdown-submenu-trigger">
+              <span className="dropdown-item-label">Add to Playlist</span>
+              <CaretRight size={14} weight="bold" className="dropdown-item-icon" />
+              <div className="dropdown-submenu">
+                {onAddToNewPlaylist && (
+                  <>
                     <button
-                      key={playlist}
-                      className="dropdown-item"
+                      type="button"
+                      className="dropdown-item create-new"
                       onClick={() => {
-                        onAddToPlaylist(playlist, track)
-                        setContextMenu(null)
+                        onAddToNewPlaylist(activeMenu.track)
+                        setActiveMenu(null)
                       }}
                     >
-                      {playlist}
+                      <span className="dropdown-item-label">+ New Playlist</span>
+                      <FolderPlus size={15} weight="bold" className="dropdown-item-icon" />
                     </button>
-                  ))}
-                </div>
+                    {playlists.length > 0 && <div className="dropdown-divider" />}
+                  </>
+                )}
+                {playlists.map((playlist) => (
+                  <button
+                    key={playlist}
+                    type="button"
+                    className="dropdown-item"
+                    onClick={() => {
+                      onAddToPlaylist(playlist, activeMenu.track)
+                      setActiveMenu(null)
+                    }}
+                  >
+                    <span className="dropdown-item-label">{playlist}</span>
+                    <FolderPlus size={15} weight="bold" className="dropdown-item-icon" />
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+          )}
 
-            <button
-              className="dropdown-item"
-              onClick={() => {
-                window.api.openFileLocation(track.filePath)
-                setContextMenu(null)
-              }}
-            >
-              Open File Location
-            </button>
+          <div className="dropdown-divider" />
 
-            {currentPlaylistName && onRemoveFromPlaylist && (
+          {/* Section 3: Credits & Utility Actions */}
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              setDetailsTrack(activeMenu.track)
+              setActiveMenu(null)
+            }}
+          >
+            <span className="dropdown-item-label">View Credits</span>
+            <Info size={16} weight="bold" className="dropdown-item-icon" />
+          </button>
+
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              const info = `${activeMenu.track.title} - ${activeMenu.track.artist || 'Unknown'}`
+              navigator.clipboard?.writeText(info)
+              setCopiedTrackId(activeMenu.track.filePath)
+              setTimeout(() => setCopiedTrackId(null), 2000)
+              setActiveMenu(null)
+            }}
+          >
+            <span className="dropdown-item-label">
+              {copiedTrackId === activeMenu.track.filePath ? 'Copied!' : 'Copy Track Info'}
+            </span>
+            <Link size={16} weight="bold" className="dropdown-item-icon" />
+          </button>
+
+          <button
+            type="button"
+            className="dropdown-item"
+            onClick={() => {
+              window.api.openFileLocation(activeMenu.track.filePath)
+              setActiveMenu(null)
+            }}
+          >
+            <span className="dropdown-item-label">Show in File Manager</span>
+            <FolderOpen size={16} weight="bold" className="dropdown-item-icon" />
+          </button>
+
+          {/* Section 4: Playlist Specific Action */}
+          {currentPlaylistName && onRemoveFromPlaylist && (
+            <>
+              <div className="dropdown-divider" />
               <button
+                type="button"
                 className="dropdown-item danger"
                 onClick={() => {
-                  onRemoveFromPlaylist(track)
-                  setContextMenu(null)
+                  onRemoveFromPlaylist(activeMenu.track)
+                  setActiveMenu(null)
                 }}
               >
-                Remove from Playlist
+                <span className="dropdown-item-label">Remove from Playlist</span>
+                <Trash size={16} weight="bold" className="dropdown-item-icon" />
               </button>
-            )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Sleek Track Credits / Audio Details Modal */}
+      {detailsTrack && (
+        <div className="track-details-backdrop" onClick={() => setDetailsTrack(null)}>
+          <div className="track-details-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="track-details-header">
+              <h3>Track Credits & Info</h3>
+              <button type="button" className="track-details-close" onClick={() => setDetailsTrack(null)}>
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+            <div className="track-details-body">
+              <div className="detail-item">
+                <span className="detail-label">Title</span>
+                <span className="detail-val">{detailsTrack.title}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Artist</span>
+                <span className="detail-val">{detailsTrack.artist || 'Unknown Artist'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Album</span>
+                <span className="detail-val">{detailsTrack.album || 'Unknown Album'}</span>
+              </div>
+              <div className="detail-item">
+                <span className="detail-label">Duration</span>
+                <span className="detail-val">{formatDuration(detailsTrack.duration)}</span>
+              </div>
+              {detailsTrack.genre && (
+                <div className="detail-item">
+                  <span className="detail-label">Genre</span>
+                  <span className="detail-val">{detailsTrack.genre}</span>
+                </div>
+              )}
+              {(detailsTrack.lossless || detailsTrack.container || detailsTrack.sampleRate) && (
+                <div className="detail-item">
+                  <span className="detail-label">Audio Quality</span>
+                  <span className="detail-val">
+                    {detailsTrack.lossless ? 'Lossless' : detailsTrack.container?.toUpperCase()}
+                    {detailsTrack.bitsPerSample && detailsTrack.sampleRate
+                      ? ` • ${detailsTrack.bitsPerSample}-bit / ${(detailsTrack.sampleRate / 1000).toFixed(1)} kHz`
+                      : ''}
+                  </span>
+                </div>
+              )}
+              <div className="detail-item full-path">
+                <span className="detail-label">Location</span>
+                <span className="detail-val path">{detailsTrack.filePath}</span>
+              </div>
+            </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
     </div>
   )
 }

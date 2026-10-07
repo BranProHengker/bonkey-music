@@ -2,11 +2,15 @@ import { useMemo, memo } from 'react'
 import {
   MagnifyingGlass,
   Play,
-  CaretRight,
   MusicNotes,
-  User
+  Clock,
+  Flame,
+  Disc,
+  ChartBar,
+  TrendUp
 } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
+import { getHydratedStats } from '../lib/listeningStats'
 
 interface DashboardHomeProps {
   tracks: TrackMeta[]
@@ -19,80 +23,32 @@ interface DashboardHomeProps {
   setSearchQuery: (query: string) => void
 }
 
-interface TopArtistItem {
-  name: string
-  trackCount: number
-  coverArt: string | null
-  sampleTrack: TrackMeta
-}
-
 function DashboardHome({
   tracks,
   albums,
   onPlayTrack,
-  onSelectArtist,
   onSelectAlbum,
-  onNavigateToLibrary,
   searchQuery,
   setSearchQuery
 }: DashboardHomeProps) {
-  // Derive Top Artists from user's actual library
-  const topArtists = useMemo<TopArtistItem[]>(() => {
-    const artistMap = new Map<string, { count: number; coverArt: string | null; sampleTrack: TrackMeta }>()
+  // Derive real listening statistics & history
+  const stats = useMemo(() => {
+    return getHydratedStats(tracks, albums)
+  }, [tracks, albums])
 
-    for (const t of tracks) {
-      if (!t.artist || t.artist === 'Unknown' || t.artist === 'Unknown Artist') continue
-      const existing = artistMap.get(t.artist)
-      if (existing) {
-        existing.count += 1
-        if (!existing.coverArt && t.coverArt) {
-          existing.coverArt = t.coverArt
-        }
-      } else {
-        artistMap.set(t.artist, {
-          count: 1,
-          coverArt: t.coverArt || null,
-          sampleTrack: t
-        })
-      }
+  // Max minutes for scaling weekly activity chart bars
+  const maxWeeklyMinutes = useMemo(() => {
+    const maxVal = Math.max(...stats.weeklyActivity.map((d) => d.minutes), 1)
+    return Math.max(maxVal, 60) // at least 60 min ceiling for proportional height
+  }, [stats.weeklyActivity])
+
+  // Find track object by filePath for instant playback
+  const handlePlaySongRecord = (filePath: string) => {
+    const found = tracks.find((t) => t.filePath === filePath)
+    if (found) {
+      onPlayTrack(found, tracks)
     }
-
-    const sorted = Array.from(artistMap.entries())
-      .sort((a, b) => b[1].count - a[1].count)
-      .slice(0, 6)
-
-    return sorted.map(([name, data]) => ({
-      name,
-      trackCount: data.count,
-      coverArt: data.coverArt,
-      sampleTrack: data.sampleTrack
-    }))
-  }, [tracks])
-
-  // Derive featured item from library (prefer track with cover art)
-  const featuredItem = useMemo(() => {
-    if (tracks.length === 0) return null
-    const withArt = tracks.find((t) => !!t.coverArt)
-    return withArt || tracks[0]
-  }, [tracks])
-
-  // Derive Highlights (Albums)
-  const highlights = useMemo(() => {
-    if (albums.length > 0) {
-      return albums.slice(0, 6)
-    }
-    const uniqueAlbums = new Map<string, { name: string; artist: string; coverArt: string | null }>()
-    for (const t of tracks) {
-      if (t.album && !uniqueAlbums.has(t.album)) {
-        uniqueAlbums.set(t.album, {
-          name: t.album,
-          artist: t.artist || 'Unknown',
-          coverArt: t.coverArt || null
-        })
-      }
-    }
-    return Array.from(uniqueAlbums.values()).slice(0, 6)
-  }, [albums, tracks])
+  }
 
   return (
     <div className="lunio-dashboard-container">
@@ -101,8 +57,7 @@ function DashboardHome({
         <div className="lunio-greeting-wrapper">
           <h1 className="lunio-greeting">Home</h1>
           <p className="lunio-library-stats">
-            {tracks.length} {tracks.length === 1 ? 'song' : 'songs'}
-            {albums.length > 0 ? ` • ${albums.length} ${albums.length === 1 ? 'album' : 'albums'}` : ''}
+            {tracks.length} {tracks.length === 1 ? 'song' : 'songs'} • {albums.length} {albums.length === 1 ? 'album' : 'albums'}
           </p>
         </div>
 
@@ -121,133 +76,196 @@ function DashboardHome({
         </div>
       </header>
 
-      {/* ─── Top Split Grid: Hero Banner + Top Artists ──────────────── */}
-      <section className="lunio-top-grid">
-        {/* Left: Featured Track Banner */}
-        <div className="lunio-hero-card">
-          <div className="lunio-hero-content">
-            <div className="lunio-hero-badge">
-              <span>Featured</span>
+      {/* ─── Listening Stats & History Chart Deck ───────────────────── */}
+      <section className="stats-history-deck">
+        {/* KPI Strip: 4 Metric Cards */}
+        <div className="stats-kpi-grid">
+          {/* Card 1: Listening Time */}
+          <div className="stats-kpi-card">
+            <div className="stats-kpi-icon-wrapper time-accent">
+              <Clock size={20} weight="bold" />
             </div>
-
-            <h2 className="lunio-hero-title">
-              {featuredItem ? featuredItem.title : 'Your Music Library'}
-            </h2>
-
-            <p className="lunio-hero-subtitle">
-              {featuredItem
-                ? `${featuredItem.artist || 'Unknown Artist'}${featuredItem.album ? ` • ${featuredItem.album}` : ''}`
-                : 'Browse and play your offline music collection.'}
-            </p>
-
-            {featuredItem && (
-              <button
-                className="lunio-hero-play-btn"
-                onClick={() => onPlayTrack(featuredItem, tracks)}
-              >
-                <Play size={16} weight="fill" />
-                <span>Play Now</span>
-              </button>
-            )}
+            <div className="stats-kpi-info">
+              <span className="stats-kpi-label">Listening Time</span>
+              <span className="stats-kpi-value">{stats.totalTimeDisplay}</span>
+            </div>
           </div>
 
-          <div className="lunio-hero-art-wrapper">
-            {featuredItem?.coverArt ? (
-              <img src={featuredItem.coverArt} alt={featuredItem.title} className="lunio-hero-cover-img" />
-            ) : (
-              <div className="lunio-hero-art-placeholder">
-                <MusicNotes size={80} weight="thin" />
-              </div>
-            )}
+          {/* Card 2: Songs Played */}
+          <div className="stats-kpi-card">
+            <div className="stats-kpi-icon-wrapper play-accent">
+              <Play size={18} weight="fill" />
+            </div>
+            <div className="stats-kpi-info">
+              <span className="stats-kpi-label">Songs Played</span>
+              <span className="stats-kpi-value">{stats.totalSongsPlayed}</span>
+            </div>
+          </div>
+
+          {/* Card 3: Top Track */}
+          <div className="stats-kpi-card">
+            <div className="stats-kpi-icon-wrapper hot-accent">
+              <Flame size={20} weight="fill" />
+            </div>
+            <div className="stats-kpi-info">
+              <span className="stats-kpi-label">Most Played Song</span>
+              <span className="stats-kpi-value truncate" title={stats.topTracks[0]?.title || 'No history'}>
+                {stats.topTracks[0]?.title || '—'}
+              </span>
+              {stats.topTracks[0] && (
+                <span className="stats-kpi-subtext">
+                  {stats.topTracks[0].count} plays • {stats.topTracks[0].artist}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Card 4: Top Album */}
+          <div className="stats-kpi-card">
+            <div className="stats-kpi-icon-wrapper album-accent">
+              <Disc size={20} weight="bold" />
+            </div>
+            <div className="stats-kpi-info">
+              <span className="stats-kpi-label">Most Played Album</span>
+              <span className="stats-kpi-value truncate" title={stats.topAlbums[0]?.album || 'No history'}>
+                {stats.topAlbums[0]?.album || '—'}
+              </span>
+              {stats.topAlbums[0] && (
+                <span className="stats-kpi-subtext">
+                  {stats.topAlbums[0].count} plays • {stats.topAlbums[0].artist}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Right: Top Artists Card */}
-        <div className="lunio-artists-card">
-          <div className="lunio-section-header">
-            <h3 className="lunio-section-title">Top Artists</h3>
-            <button className="lunio-see-more-link" onClick={onNavigateToLibrary}>
-              <span>See All</span>
-              <CaretRight size={13} weight="bold" />
-            </button>
+        {/* Split Section: Weekly Activity Bar Chart + Top Played Songs */}
+        <div className="stats-chart-split">
+          {/* Left: Weekly Listening Activity Chart */}
+          <div className="stats-chart-card">
+            <div className="stats-card-header">
+              <div className="stats-card-title-group">
+                <ChartBar size={18} weight="bold" className="stats-title-icon" />
+                <h3 className="stats-card-title">Listening Activity</h3>
+              </div>
+              <span className="stats-card-tag">Past 7 Days</span>
+            </div>
+
+            <div className="activity-chart-wrapper">
+              <div className="activity-bars-container">
+                {stats.weeklyActivity.map((item, idx) => {
+                  const heightPercent = Math.max(12, Math.min(100, (item.minutes / maxWeeklyMinutes) * 100))
+                  const isPeak = item.minutes === Math.max(...stats.weeklyActivity.map((d) => d.minutes)) && item.minutes > 0
+
+                  return (
+                    <div key={`${item.dateStr}-${idx}`} className="activity-bar-column">
+                      <div className="activity-bar-tooltip">
+                        {item.minutes}m
+                      </div>
+                      <div className="activity-bar-track">
+                        <div
+                          className={`activity-bar-fill ${isPeak ? 'peak' : ''}`}
+                          style={{ height: `${heightPercent}%` }}
+                        />
+                      </div>
+                      <span className={`activity-day-label ${isPeak ? 'peak-label' : ''}`}>
+                        {item.day}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
-          <div className="lunio-artists-grid">
-            {topArtists.length === 0 ? (
-              <div className="lunio-empty-hint">Add songs to see your top artists</div>
-            ) : (
-              topArtists.map((artist) => (
-                <div
-                  key={artist.name}
-                  className="lunio-artist-item"
-                  onClick={() => onSelectArtist(artist.name)}
-                  title={`View songs by ${artist.name}`}
-                >
-                  <div className="lunio-artist-avatar">
-                    {artist.coverArt ? (
-                      <img src={artist.coverArt} alt={artist.name} />
-                    ) : (
-                      <User size={18} weight="regular" />
-                    )}
-                  </div>
-                  <div className="lunio-artist-info">
-                    <span className="lunio-artist-name">{artist.name}</span>
-                    <span className="lunio-artist-listeners">
-                      {artist.trackCount} {artist.trackCount === 1 ? 'song' : 'songs'}
+          {/* Right: Most Played Songs */}
+          <div className="stats-top-songs-card">
+            <div className="stats-card-header">
+              <div className="stats-card-title-group">
+                <TrendUp size={18} weight="bold" className="stats-title-icon" />
+                <h3 className="stats-card-title">Frequently Played Songs</h3>
+              </div>
+            </div>
+
+            <div className="top-songs-list">
+              {stats.topTracks.length === 0 ? (
+                <div className="stats-empty-hint">Start listening to build your top songs list</div>
+              ) : (
+                stats.topTracks.map((song, idx) => (
+                  <div
+                    key={song.filePath}
+                    className="top-song-row"
+                    onClick={() => handlePlaySongRecord(song.filePath)}
+                    title={`Play ${song.title}`}
+                  >
+                    <span className="top-song-rank">0{idx + 1}</span>
+                    <div className="top-song-thumb">
+                      {song.coverArt ? (
+                        <img src={song.coverArt} alt={song.title} />
+                      ) : (
+                        <MusicNotes size={16} weight="light" />
+                      )}
+                      <div className="top-song-play-icon">
+                        <Play size={12} weight="fill" />
+                      </div>
+                    </div>
+                    <div className="top-song-meta">
+                      <span className="top-song-title" title={song.title}>{song.title}</span>
+                      <span className="top-song-artist" title={song.artist}>{song.artist}</span>
+                    </div>
+                    <span className="top-song-count-badge">
+                      {song.count} {song.count === 1 ? 'play' : 'plays'}
                     </span>
                   </div>
-                  <CaretRight size={14} weight="bold" className="lunio-artist-chevron" />
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* ─── Bottom Section: Listening Highlights ───────────────────── */}
-      <section className="lunio-highlights-section">
+      {/* ─── All Albums Grid ("Semua Album") ───────────────────────── */}
+      <section className="all-albums-section">
         <div className="lunio-section-header">
-          <h3 className="lunio-section-title">Albums</h3>
-          <button className="lunio-see-more-link" onClick={onNavigateToLibrary}>
-            <span>See All</span>
-            <CaretRight size={13} weight="bold" />
-          </button>
+          <h2 className="all-albums-title">All Albums</h2>
+          <span className="all-albums-count-tag">{albums.length} albums</span>
         </div>
 
-        <div className="lunio-highlights-grid">
-          {highlights.length === 0 ? (
-            <div className="lunio-empty-hint">No albums found in library</div>
+        <div className="all-albums-grid">
+          {albums.length === 0 ? (
+            <div className="lunio-empty-hint">No albums found in your library</div>
           ) : (
-            highlights.map((album, idx) => (
+            albums.map((album, idx) => (
               <div
                 key={`${album.name}-${idx}`}
-                className="lunio-highlight-card"
+                className="album-card"
                 onClick={() => onSelectAlbum(album.name)}
               >
-                <div className="lunio-highlight-thumb">
+                <div className="album-card-thumb">
                   {album.coverArt ? (
-                    <img src={album.coverArt} alt={album.name} />
+                    <img src={album.coverArt} alt={album.name} loading="lazy" />
                   ) : (
-                    <div className="lunio-highlight-placeholder">
-                      <MusicNotes size={32} weight="light" />
+                    <div className="album-card-placeholder">
+                      <MusicNotes size={40} weight="light" />
                     </div>
                   )}
                   <button
-                    className="lunio-highlight-play-overlay"
+                    className="album-card-play-overlay"
                     title={`Play ${album.name}`}
                     onClick={(e) => {
                       e.stopPropagation()
                       onSelectAlbum(album.name)
                     }}
+                    aria-label={`Play ${album.name}`}
                   >
-                    <Play size={18} weight="fill" />
+                    <Play size={20} weight="fill" />
                   </button>
                 </div>
-                <div className="lunio-highlight-meta">
-                  <h4 className="lunio-highlight-title" title={album.name}>
+                <div className="album-card-info">
+                  <h4 className="album-card-name" title={album.name}>
                     {album.name}
                   </h4>
-                  <p className="lunio-highlight-artist" title={album.artist}>
+                  <p className="album-card-artist" title={album.artist}>
                     {album.artist}
                   </p>
                 </div>

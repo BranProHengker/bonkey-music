@@ -27,6 +27,7 @@ import NowPlayingView from './components/NowPlayingView'
 import StudioHub from './components/studio/StudioHub'
 import DashboardHome from './components/DashboardHome'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
+import { recordTrackPlay, recordListeningDuration } from './lib/listeningStats'
 
 interface AlbumGroup {
   name: string
@@ -51,6 +52,7 @@ export default function App(): React.JSX.Element {
     togglePlay,
     toggleRepeat,
     isShuffle,
+    isRepeat,
     queue,
     addToQueue,
     removeFromQueue,
@@ -836,9 +838,18 @@ export default function App(): React.JSX.Element {
 
   // ─── Handlers ───────────────────────────────────────────────────────
   const handlePlayTrack = (track: TrackMeta) => {
+    recordTrackPlay(track)
     // Provide queue context so next/prev can advance sequentially within current filtered list
     playTrack(track, displayedTracks)
   }
+
+  useEffect(() => {
+    if (!isPlaying || !currentTrack) return
+    const interval = setInterval(() => {
+      recordListeningDuration(5)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [isPlaying, currentTrack])
 
   const handleSelectArtistFromDashboard = (artist: string) => {
     setSearchQuery(artist)
@@ -1490,30 +1501,41 @@ export default function App(): React.JSX.Element {
           onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
           isQueueOpen={isQueueOpen}
           sourceTitle={activePlaylist ? `Playing from ${activePlaylist}` : 'Playing from Queue'}
+          isShuffle={isShuffle}
+          onToggleShuffle={toggleShuffle}
+          isRepeat={isRepeat}
+          onToggleRepeat={toggleRepeat}
+          isFavorite={currentTrack ? favorites.includes(currentTrack.filePath) : false}
+          onToggleFavorite={currentTrack ? () => handleToggleFavorite(currentTrack.filePath) : undefined}
+          onAddToPlaylist={handleAddToPlaylist}
+          onAddToNewPlaylist={handleCreatePlaylist}
+          playlists={playlists}
         />
       )}
 
-      {/* Bottom fixed Player Control Bar */}
-      <PlayerBar
-        onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
-        isQueueOpen={isQueueOpen}
-        onToggleLyrics={() => {
-          setIsNowPlayingOpen(false)
-          setIsLyricsOpen((prev) => !prev)
-        }}
-        isLyricsOpen={isLyricsOpen}
-        displayedTracks={displayedTracks}
-        playlists={playlists}
-        favorites={favorites}
-        onAddToQueue={addToQueue}
-        onToggleFavorite={handleToggleFavorite}
-        onAddToPlaylist={handleAddToPlaylist}
-        onAddToNewPlaylist={handleCreatePlaylist}
-        onOpenNowPlaying={() => {
-          setIsLyricsOpen(false)
-          setIsNowPlayingOpen(true)
-        }}
-      />
+      {/* Bottom fixed Player Control Bar (Hidden when Now Playing modal is active) */}
+      {!isNowPlayingOpen && (
+        <PlayerBar
+          onToggleQueue={() => setIsQueueOpen((prev) => !prev)}
+          isQueueOpen={isQueueOpen}
+          onToggleLyrics={() => {
+            setIsNowPlayingOpen(false)
+            setIsLyricsOpen((prev) => !prev)
+          }}
+          isLyricsOpen={isLyricsOpen}
+          displayedTracks={displayedTracks}
+          playlists={playlists}
+          favorites={favorites}
+          onAddToQueue={addToQueue}
+          onToggleFavorite={handleToggleFavorite}
+          onAddToPlaylist={handleAddToPlaylist}
+          onAddToNewPlaylist={handleCreatePlaylist}
+          onOpenNowPlaying={() => {
+            setIsLyricsOpen(false)
+            setIsNowPlayingOpen(true)
+          }}
+        />
+      )}
 
       {/* Create New Playlist Custom Modal */}
       {isCreatePlaylistOpen && (

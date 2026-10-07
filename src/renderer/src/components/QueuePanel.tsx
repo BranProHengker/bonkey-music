@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Trash, X, Shuffle, MagnifyingGlass, MusicNotes } from '@phosphor-icons/react'
+import { Trash, X, Shuffle, MagnifyingGlass, MusicNotes, Play } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
 interface QueuePanelProps {
@@ -28,6 +28,7 @@ export default function QueuePanel({
   onShuffleQueue,
   onPlayTrack,
   currentTrack,
+  isPlaying,
   queue
 }: QueuePanelProps) {
   const [searchVal, setSearchVal] = useState('')
@@ -86,20 +87,41 @@ export default function QueuePanel({
     <div className={`queue-panel ${isOpen ? 'open' : 'closed'} ${isLyricsOpen ? 'on-lyrics' : ''}`}>
       {/* Header */}
       <div className="queue-header">
-        <span className="queue-title">Play Queue</span>
+        <div className="queue-header-left">
+          <span className="queue-title">Play Queue</span>
+          <span className="queue-count-badge">{queue.length}</span>
+        </div>
         <div className="queue-actions">
           {queue.length > 0 && (
             <>
-              <button onClick={onShuffleQueue} title="Shuffle Queue">
-                <Shuffle size={16} weight="light" />
+              <button
+                type="button"
+                className="btn-queue-action"
+                onClick={onShuffleQueue}
+                title="Shuffle Queue"
+                aria-label="Shuffle Queue"
+              >
+                <Shuffle size={16} weight="bold" />
               </button>
-              <button onClick={onClearQueue} title="Clear Queue">
-                <Trash size={16} weight="light" />
+              <button
+                type="button"
+                className="btn-queue-action"
+                onClick={onClearQueue}
+                title="Clear Queue"
+                aria-label="Clear Queue"
+              >
+                <Trash size={16} weight="bold" />
               </button>
             </>
           )}
-          <button onClick={onClose} title="Close Panel">
-            <X size={18} weight="light" />
+          <button
+            type="button"
+            className="btn-queue-action btn-queue-close"
+            onClick={onClose}
+            title="Close Panel"
+            aria-label="Close"
+          >
+            <X size={16} weight="bold" />
           </button>
         </div>
       </div>
@@ -108,9 +130,13 @@ export default function QueuePanel({
       <div className="queue-list-container">
         {queue.length === 0 ? (
           <div className="queue-empty-state">
-            <MusicNotes size={32} weight="light" style={{ opacity: 0.3, marginBottom: '4px' }} />
-            <span>Queue is empty.</span>
-            <span style={{ fontSize: '11px', opacity: 0.5 }}>Search below to add tracks manually or double click a track from your library.</span>
+            <div className="queue-empty-icon-box">
+              <MusicNotes size={28} weight="light" />
+            </div>
+            <span className="queue-empty-title">Queue is empty</span>
+            <span className="queue-empty-desc">
+              Search below or select songs from your library to queue them up.
+            </span>
           </div>
         ) : (
           queue.map((track) => {
@@ -119,13 +145,25 @@ export default function QueuePanel({
               <div
                 key={track.filePath}
                 className={`queue-item-row ${isActive ? 'active' : ''}`}
-                onDoubleClick={() => onPlayTrack(track)}
+                onClick={() => onPlayTrack(track)}
+                title={`Play ${track.title}`}
               >
                 <div className="queue-item-thumb">
                   {track.coverArt ? (
-                    <img src={track.coverArt} alt="Cover Art" />
+                    <img src={track.coverArt} alt={track.title} loading="lazy" />
                   ) : (
-                    <MusicNotes size={14} weight="light" />
+                    <MusicNotes size={16} weight="light" />
+                  )}
+                  {isActive && isPlaying ? (
+                    <div className="queue-equalizer-overlay">
+                      <span className="eq-bar eq-1" />
+                      <span className="eq-bar eq-2" />
+                      <span className="eq-bar eq-3" />
+                    </div>
+                  ) : (
+                    <div className="queue-item-play-overlay">
+                      <Play size={12} weight="fill" />
+                    </div>
                   )}
                 </div>
                 <div className="queue-item-details">
@@ -138,14 +176,16 @@ export default function QueuePanel({
                 </div>
                 <span className="queue-item-time">{formatTime(track.duration)}</span>
                 <button
+                  type="button"
                   className="btn-queue-remove"
                   title="Remove from queue"
+                  aria-label="Remove"
                   onClick={(e) => {
                     e.stopPropagation()
                     onRemoveFromQueue(track.filePath)
                   }}
                 >
-                  <X size={12} weight="light" />
+                  <X size={13} weight="bold" />
                 </button>
               </div>
             )
