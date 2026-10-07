@@ -21,7 +21,7 @@ interface StudioHubProps {
 
 export default function StudioHub({
   currentTrack,
-  currentTime = 0,
+  currentTime,
   seek,
   allTracks = []
 }: StudioHubProps) {

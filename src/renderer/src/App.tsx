@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import {
   MagnifyingGlass,
   FolderOpen,
@@ -52,9 +52,8 @@ export default function App(): React.JSX.Element {
     removeFromQueue,
     clearQueue,
     shuffleQueue,
-    currentTime,
-    duration,
     seek,
+    seekOffset,
     toggleMute
   } = useAudioEngine()
 
@@ -113,29 +112,49 @@ export default function App(): React.JSX.Element {
     setHistoryIndex(nextHistory.length - 1)
   }, [currentView, activePlaylist, activeAlbum])
 
-  const goBack = () => {
-    if (historyIndex > 0) {
-      setIsNavigatingHistory(true)
-      const nextIndex = historyIndex - 1
-      setHistoryIndex(nextIndex)
-      const state = history[nextIndex]
-      setCurrentView(state.currentView)
-      setActivePlaylist(state.activePlaylist)
-      setActiveAlbum(state.activeAlbum)
-    }
-  }
+  const currentTrackRef = useRef(currentTrack)
+  const displayedTracksRef = useRef<TrackMeta[]>([])
+  const isShuffleRef = useRef(isShuffle)
+  const volumeRef = useRef(volume)
+  const historyRef = useRef(history)
+  const historyIndexRef = useRef(historyIndex)
 
-  const goForward = () => {
-    if (historyIndex < history.length - 1) {
+  useEffect(() => {
+    currentTrackRef.current = currentTrack
+    displayedTracksRef.current = displayedTracks
+    isShuffleRef.current = isShuffle
+    volumeRef.current = volume
+    historyRef.current = history
+    historyIndexRef.current = historyIndex
+  })
+
+  const goBack = useCallback(() => {
+    if (historyIndexRef.current > 0) {
       setIsNavigatingHistory(true)
-      const nextIndex = historyIndex + 1
+      const nextIndex = historyIndexRef.current - 1
       setHistoryIndex(nextIndex)
-      const state = history[nextIndex]
-      setCurrentView(state.currentView)
-      setActivePlaylist(state.activePlaylist)
-      setActiveAlbum(state.activeAlbum)
+      const state = historyRef.current[nextIndex]
+      if (state) {
+        setCurrentView(state.currentView)
+        setActivePlaylist(state.activePlaylist)
+        setActiveAlbum(state.activeAlbum)
+      }
     }
-  }
+  }, [])
+
+  const goForward = useCallback(() => {
+    if (historyIndexRef.current < historyRef.current.length - 1) {
+      setIsNavigatingHistory(true)
+      const nextIndex = historyIndexRef.current + 1
+      setHistoryIndex(nextIndex)
+      const state = historyRef.current[nextIndex]
+      if (state) {
+        setCurrentView(state.currentView)
+        setActivePlaylist(state.activePlaylist)
+        setActiveAlbum(state.activeAlbum)
+      }
+    }
+  }, [])
 
   const handleRefreshLibraryRef = useRef<() => void>(() => {})
 
@@ -163,14 +182,14 @@ export default function App(): React.JSX.Element {
       if (e.key === ' ' || e.key === 'Spacebar') {
         if (!isInput) {
           e.preventDefault()
-          if (currentTrack) {
+          if (currentTrackRef.current) {
             togglePlay()
-          } else if (displayedTracks && displayedTracks.length > 0) {
-            if (isShuffle) {
-              const randomIndex = Math.floor(Math.random() * displayedTracks.length)
-              playTrack(displayedTracks[randomIndex], displayedTracks)
+          } else if (displayedTracksRef.current && displayedTracksRef.current.length > 0) {
+            if (isShuffleRef.current) {
+              const randomIndex = Math.floor(Math.random() * displayedTracksRef.current.length)
+              playTrack(displayedTracksRef.current[randomIndex], displayedTracksRef.current)
             } else {
-              playTrack(displayedTracks[0], displayedTracks)
+              playTrack(displayedTracksRef.current[0], displayedTracksRef.current)
             }
           }
         }
@@ -178,7 +197,6 @@ export default function App(): React.JSX.Element {
 
       // Handle Hardware Media Keys directly from Headset/IEM/TWS or Keyboard
       const mediaKey = e.key.toLowerCase()
-      console.log('Bonkey Music - Key pressed:', e.key, 'code:', e.code)
 
       if (
         mediaKey === 'mediaplaypause' ||
@@ -215,10 +233,10 @@ export default function App(): React.JSX.Element {
           prevTrack()
         } else if (e.key === 'ArrowUp') {
           e.preventDefault()
-          changeVolume(Math.min(1, volume + 0.05))
+          changeVolume(Math.min(1, volumeRef.current + 0.05))
         } else if (e.key === 'ArrowDown') {
           e.preventDefault()
-          changeVolume(Math.max(0, volume - 0.05))
+          changeVolume(Math.max(0, volumeRef.current - 0.05))
         } else if (!e.shiftKey && (e.key === 'r' || e.key === 'R')) {
           e.preventDefault()
           toggleShuffle()
@@ -245,10 +263,10 @@ export default function App(): React.JSX.Element {
       if (e.shiftKey && !e.ctrlKey) {
         if (e.key === 'ArrowRight') {
           e.preventDefault()
-          seek(Math.min(duration, currentTime + 5))
+          seekOffset(5)
         } else if (e.key === 'ArrowLeft') {
           e.preventDefault()
-          seek(Math.max(0, currentTime - 5))
+          seekOffset(-5)
         }
       }
     }
@@ -258,9 +276,9 @@ export default function App(): React.JSX.Element {
       if (e.ctrlKey) {
         e.preventDefault()
         if (e.deltaY < 0) {
-          changeVolume(Math.min(1, volume + 0.05))
+          changeVolume(Math.min(1, volumeRef.current + 0.05))
         } else if (e.deltaY > 0) {
-          changeVolume(Math.max(0, volume - 0.05))
+          changeVolume(Math.max(0, volumeRef.current - 0.05))
         }
       }
     }
@@ -274,7 +292,7 @@ export default function App(): React.JSX.Element {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('wheel', handleWheel)
     }
-  }, [historyIndex, history, volume, changeVolume, nextTrack, prevTrack, toggleShuffle, togglePlay, toggleRepeat, isShuffle, setIsQueueOpen, currentTime, duration, seek, toggleMute])
+  }, [goBack, goForward, togglePlay, playTrack, nextTrack, prevTrack, toggleShuffle, toggleRepeat, toggleMute, seekOffset, changeVolume])
 
   // ─── Save Settings Helper ───────────────────────────────────────────
   const persistSettings = async (updates: Record<string, unknown>) => {
@@ -891,7 +909,6 @@ export default function App(): React.JSX.Element {
         {currentView === 'studio' ? (
           <StudioHub
             currentTrack={currentTrack}
-            currentTime={currentTime}
             seek={seek}
             isPlaying={isPlaying}
             togglePlay={togglePlay}
@@ -1345,7 +1362,6 @@ export default function App(): React.JSX.Element {
       {isLyricsOpen && (
         <LyricsView
           currentTrack={currentTrack}
-          currentTime={currentTime}
           seek={seek}
           onClose={() => setIsLyricsOpen(false)}
           isQueueOpen={isQueueOpen}

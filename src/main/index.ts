@@ -594,7 +594,6 @@ app.whenReady().then(async () => {
   })
   // ─── IPC: Get Lyrics ─────────────────────────────────────────────
   ipcMain.handle('get-lyrics', async (_event, audioFilePath: string) => {
-    console.log('[Main IPC] get-lyrics requested for:', audioFilePath)
     try {
       // Replace audio extension with .lrc or .txt (check multiple extension casings)
       const baseName = audioFilePath.replace(/\.[^.]+$/, '')
@@ -919,14 +918,11 @@ app.whenReady().then(async () => {
   connectDiscord()
 
   ipcMain.on('update-discord-status', (_event, songData: any) => {
-    console.log('[Discord RPC] update-discord-status triggered. isRpcConnected:', isRpcConnected, 'songData:', songData)
     if (!rpcClient) {
-      console.log('[Discord RPC] No rpcClient initialized')
       return
     }
 
     if (!isRpcConnected) {
-      console.log('[Discord RPC] Client not connected. Attempting connection...')
       connectDiscord()
       return
     }
@@ -934,7 +930,6 @@ app.whenReady().then(async () => {
     try {
       // Only clear activity when there's truly nothing to show
       if (!songData || !songData.title) {
-        console.log('[Discord RPC] Clearing activity (no track)')
         rpcClient.clearActivity().catch(() => {})
         return
       }
@@ -957,14 +952,9 @@ app.whenReady().then(async () => {
           instance: false
         }
 
-        console.log('[Discord RPC] Setting activity (playing):', activityPayload)
-        rpcClient.setActivity(activityPayload)
-          .then(() => {
-            console.log('[Discord RPC] setActivity resolved successfully')
-          })
-          .catch((err) => {
-            console.warn('[Discord RPC] Failed to set activity:', err)
-          })
+        rpcClient.setActivity(activityPayload).catch((err) => {
+          console.warn('[Discord RPC] Failed to set activity:', err)
+        })
       } else {
         // Paused: show track info with "Paused" state, no timestamp
         const activityPayload = {
@@ -977,14 +967,9 @@ app.whenReady().then(async () => {
           instance: false
         }
 
-        console.log('[Discord RPC] Setting activity (paused):', activityPayload)
-        rpcClient.setActivity(activityPayload)
-          .then(() => {
-            console.log('[Discord RPC] setActivity (paused) resolved successfully')
-          })
-          .catch((err) => {
-            console.warn('[Discord RPC] Failed to set paused activity:', err)
-          })
+        rpcClient.setActivity(activityPayload).catch((err) => {
+          console.warn('[Discord RPC] Failed to set paused activity:', err)
+        })
       }
     } catch (err) {
       console.error('[Discord RPC] Error in activity update:', err)

@@ -15,7 +15,7 @@ import {
   Disc
 } from '@phosphor-icons/react'
 import type { LrcSearchResult } from '../../../../preload/index.d'
-import type { TrackMeta } from '../../hooks/useAudioEngine'
+import { type TrackMeta, useAudioTime } from '../../hooks/useAudioEngine'
 
 interface LrcStudioProps {
   currentTrack?: TrackMeta | null
@@ -34,10 +34,12 @@ interface ParsedLyricLine {
 
 export default function LrcStudio({
   currentTrack,
-  currentTime = 0,
+  currentTime: propCurrentTime,
   seek,
   initialQuery = ''
 }: LrcStudioProps) {
+  const hookTime = useAudioTime()
+  const currentTime = propCurrentTime !== undefined ? propCurrentTime : hookTime
   const [searchQuery, setSearchQuery] = useState(initialQuery)
   const [isSearching, setIsSearching] = useState(false)
   const [searchResults, setSearchResults] = useState<LrcSearchResult[]>([])

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState, useMemo, memo, forwardRef } from 'react'
+import { useEffect, useRef, useState, useMemo, useCallback, memo, forwardRef } from 'react'
 import { MusicNotes, X, SidebarSimple, CloudArrowDown, ArrowClockwise } from '@phosphor-icons/react'
-import { TrackMeta } from '../hooks/useAudioEngine'
+import { TrackMeta, useAudioTime } from '../hooks/useAudioEngine'
 
 interface LyricLine {
   time: number // in seconds (-1 for plain unsynced lines)
@@ -11,7 +11,7 @@ interface LyricLine {
 
 interface LyricsViewProps {
   currentTrack: TrackMeta | null
-  currentTime: number
+  currentTime?: number
   seek: (time: number) => void
   onClose: () => void
   isQueueOpen?: boolean
@@ -25,18 +25,18 @@ interface LyricLineItemProps {
   isActive: boolean
   isPast: boolean
   distance: number
-  onClick: () => void
+  onLineClick: (time: number) => void
 }
 
 const LyricLineItem = forwardRef<HTMLDivElement, LyricLineItemProps>(
-  ({ text, subText, time, isActive, isPast, distance, onClick }, ref) => {
+  ({ text, subText, time, isActive, isPast, distance, onLineClick }, ref) => {
     const clampedDistance = time === -1 ? -1 : Math.min(3, Math.max(0, distance))
     return (
       <div
         ref={ref}
         className={`lyric-line ${isActive ? 'active' : ''} ${isPast ? 'past' : ''} ${time === -1 ? 'no-sync' : ''} ${subText ? 'dual-line' : ''}`}
         data-distance={clampedDistance}
-        onClick={onClick}
+        onClick={() => onLineClick(time)}
       >
         <div className="lyric-main-text">{text}</div>
         {subText && <div className="lyric-sub-text">{subText}</div>}
@@ -48,14 +48,16 @@ const LyricLineItem = forwardRef<HTMLDivElement, LyricLineItemProps>(
 LyricLineItem.displayName = 'LyricLineItem'
 const MemoizedLyricLineItem = memo(LyricLineItem)
 
-export default function LyricsView({
+function LyricsView({
   currentTrack,
-  currentTime,
+  currentTime: propCurrentTime,
   seek,
   onClose,
   isQueueOpen = false,
   onCloseQueue
 }: LyricsViewProps): React.JSX.Element {
+  const hookTime = useAudioTime()
+  const currentTime = propCurrentTime !== undefined ? propCurrentTime : hookTime
   const [rawLyrics, setRawLyrics] = useState<string | null>(null)
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
   const [onlineSearchNotice, setOnlineSearchNotice] = useState<string | null>(null)
@@ -358,16 +360,19 @@ export default function LyricsView({
     }, 2500)
   }
 
-  const handleLineClick = (time: number) => {
-    if (time >= 0) {
-      setIsUserInteracting(false)
-      setUserOffset(0)
-      if (userScrollTimeoutRef.current) {
-        clearTimeout(userScrollTimeoutRef.current)
+  const handleLineClick = useCallback(
+    (time: number) => {
+      if (time >= 0) {
+        setIsUserInteracting(false)
+        setUserOffset(0)
+        if (userScrollTimeoutRef.current) {
+          clearTimeout(userScrollTimeoutRef.current)
+        }
+        seek(time)
       }
-      seek(time)
-    }
-  }
+    },
+    [seek]
+  )
 
   const coverArtSrc = currentTrack?.coverArt || ''
 
@@ -504,7 +509,7 @@ export default function LyricsView({
                         isActive={isActive}
                         isPast={isPast}
                         distance={distance}
-                        onClick={() => handleLineClick(line.time)}
+                        onLineClick={handleLineClick}
                       />
                     )
                   })}
@@ -532,3 +537,5 @@ export default function LyricsView({
     </div>
   )
 }
+
+export default memo(LyricsView)

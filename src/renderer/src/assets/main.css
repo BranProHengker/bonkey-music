@@ -1133,7 +1133,9 @@ button {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 13px;
-  transition: all var(--duration-fast) var(--ease-out-expo);
+  transition: background-color var(--duration-fast) var(--ease-out-expo), border-color var(--duration-fast) var(--ease-out-expo);
+  content-visibility: auto;
+  contain-intrinsic-size: 0 46px;
   cursor: pointer;
   border: 1px solid transparent;
 }
@@ -1990,7 +1992,8 @@ button {
   filter: blur(130px) saturate(220%) brightness(0.6);
   z-index: 1;
   transition: background-image 0.9s ease-in-out;
-  transform: scale(1.2);
+  transform: translate3d(0, 0, 0) scale(1.2);
+  will-change: transform;
   opacity: 0.7;
 }
 
@@ -2362,41 +2365,35 @@ button {
   padding: 6px 0;
   display: flex;
   flex-direction: column;
-  will-change: transform, opacity, filter;
+  will-change: transform, opacity;
   /* Ultra-smooth hardware-composited transition */
   transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-              filter 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+              opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   /* Default: far lines (distance >= 3) */
   opacity: 0.12;
   transform: scale(0.93) translate3d(0, 0, 0);
-  filter: blur(3.2px);
 }
 
 /* ─── Depth of Field Tiers (Pure Hardware Composited) ─── */
 .lyric-line[data-distance="2"] {
   opacity: 0.28;
   transform: scale(0.96) translate3d(0, 0, 0);
-  filter: blur(1.8px);
 }
 
 .lyric-line[data-distance="1"] {
   opacity: 0.55;
   transform: scale(0.99) translate3d(0, 0, 0);
-  filter: blur(0.75px);
 }
 
 .lyric-line.active,
 .lyric-line[data-distance="0"] {
   opacity: 1;
   transform: scale(1.05) translate3d(6px, 0, 0);
-  filter: blur(0px);
 }
 
 .lyric-line:hover:not(.active) {
   opacity: 0.75;
   transform: scale(0.98) translate3d(2px, 0, 0);
-  filter: blur(0.2px);
 }
 
 .lyric-main-text {

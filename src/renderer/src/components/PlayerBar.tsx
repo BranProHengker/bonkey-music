@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, memo } from 'react'
 import {
   Play,
   Pause,
@@ -15,7 +15,7 @@ import {
   PlusCircle,
   Heart
 } from '@phosphor-icons/react'
-import { useAudioEngine } from '../hooks/useAudioEngine'
+import { useAudioEngine, useAudioTime } from '../hooks/useAudioEngine'
 import { TrackMeta } from '../context/AudioContext'
 
 interface PlayerBarProps {
@@ -32,7 +32,7 @@ interface PlayerBarProps {
   onAddToNewPlaylist?: (track: TrackMeta) => void
 }
 
-export default function PlayerBar({
+function PlayerBar({
   onToggleQueue,
   isQueueOpen,
   onToggleLyrics,
@@ -48,7 +48,6 @@ export default function PlayerBar({
   const {
     currentTrack,
     isPlaying,
-    currentTime,
     duration,
     volume,
     isMuted,
@@ -64,6 +63,8 @@ export default function PlayerBar({
     toggleShuffle,
     toggleRepeat
   } = useAudioEngine()
+
+  const currentTime = useAudioTime()
 
   const [isDragging, setIsDragging] = useState(false)
   const [dragTime, setDragTime] = useState(0)
@@ -444,4 +445,6 @@ export default function PlayerBar({
     </div>
   )
 }
+
+export default memo(PlayerBar)
 
