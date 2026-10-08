@@ -382,30 +382,18 @@ function LyricsView({
 
       {/* Top Navigation & Track Bar */}
       <div className="lyrics-top-bar">
-        <div
-          className="lyrics-track-pill"
-          onClick={onSwitchToNowPlaying}
-          style={{ cursor: onSwitchToNowPlaying ? 'pointer' : 'default' }}
-          title={onSwitchToNowPlaying ? 'Switch to Now Playing (Cover View)' : undefined}
-        >
-          {coverArtSrc ? (
-            <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-pill-thumb" />
-          ) : (
-            <div className="lyrics-pill-thumb-placeholder">
-              <MusicNotes size={18} weight="bold" />
-            </div>
-          )}
-          <div className="lyrics-pill-info">
-            <span className="lyrics-pill-title" title={currentTrack?.title}>
-              {currentTrack?.title || 'Unknown Title'}
-            </span>
-            <span className="lyrics-pill-artist" title={currentTrack?.artist}>
-              {currentTrack?.artist || 'Unknown Artist'}
-            </span>
-          </div>
-        </div>
-
+        {/* Action Icons in Top-Left Corner: Close (X) & More Options (...) */}
         <div className="lyrics-top-actions">
+          <button
+            type="button"
+            className="lyrics-action-btn-circle"
+            onClick={onClose}
+            title="Close Lyrics (Esc)"
+            aria-label="Close Lyrics (Esc)"
+          >
+            <X size={18} weight="bold" />
+          </button>
+
           <div className="lyrics-options-wrapper">
             <button
               type="button"
@@ -467,16 +455,29 @@ function LyricsView({
               </div>
             )}
           </div>
+        </div>
 
-          <button
-            type="button"
-            className="lyrics-action-btn-circle"
-            onClick={onClose}
-            title="Close Lyrics (Esc)"
-            aria-label="Close Lyrics (Esc)"
-          >
-            <X size={18} weight="bold" />
-          </button>
+        <div
+          className="lyrics-track-pill"
+          onClick={onSwitchToNowPlaying}
+          style={{ cursor: onSwitchToNowPlaying ? 'pointer' : 'default' }}
+          title={onSwitchToNowPlaying ? 'Switch to Now Playing (Cover View)' : undefined}
+        >
+          {coverArtSrc ? (
+            <img src={coverArtSrc} alt={currentTrack?.title} className="lyrics-pill-thumb" />
+          ) : (
+            <div className="lyrics-pill-thumb-placeholder">
+              <MusicNotes size={18} weight="bold" />
+            </div>
+          )}
+          <div className="lyrics-pill-info">
+            <span className="lyrics-pill-title" title={currentTrack?.title}>
+              {currentTrack?.title || 'Unknown Title'}
+            </span>
+            <span className="lyrics-pill-artist" title={currentTrack?.artist}>
+              {currentTrack?.artist || 'Unknown Artist'}
+            </span>
+          </div>
         </div>
       </div>
 

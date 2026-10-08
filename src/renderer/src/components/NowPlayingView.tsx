@@ -97,6 +97,7 @@ function NowPlayingView({
     queue,
     playTrack,
     removeFromQueue,
+    reorderQueue,
     isShuffle: engineShuffle,
     toggleShuffle: engineToggleShuffle,
     isRepeat: engineRepeat,
@@ -116,6 +117,8 @@ function NowPlayingView({
   const [dragTime, setDragTime] = useState(0)
   const [isClosing, setIsClosing] = useState(false)
   const [isBodyQueueOpen, setIsBodyQueueOpen] = useState(false)
+  const [draggedQueueIndex, setDraggedQueueIndex] = useState<number | null>(null)
+  const [dragOverQueueIndex, setDragOverQueueIndex] = useState<number | null>(null)
 
   const overlayRef = useRef<HTMLDivElement | null>(null)
   const isDraggingSheetRef = useRef(false)
@@ -402,12 +405,18 @@ function NowPlayingView({
         <div className="now-playing-drag-handle-pill" />
 
         <div className="now-playing-header">
-          <div className="now-playing-source-pill">
-            <span>{sourceTitle}</span>
-          </div>
-
-          {/* Action Icons: More Options (...) & Close (X) placed in Top-Right Corner */}
+          {/* Action Icons: Close (X) & More Options (...) placed in Top-Left Corner */}
           <div className="now-playing-top-actions">
+            <button
+              type="button"
+              className="now-playing-action-icon-circle"
+              onClick={triggerClose}
+              title="Close (Esc)"
+              aria-label="Close"
+            >
+              <X size={18} weight="bold" />
+            </button>
+
             <div className="now-playing-options-wrapper" style={{ position: 'relative' }}>
               <button
                 type="button"
@@ -547,16 +556,10 @@ function NowPlayingView({
                 </div>
               )}
             </div>
+          </div>
 
-            <button
-              type="button"
-              className="now-playing-action-icon-circle"
-              onClick={triggerClose}
-              title="Close (Esc)"
-              aria-label="Close"
-            >
-              <X size={18} weight="bold" />
-            </button>
+          <div className="now-playing-source-pill">
+            <span>{sourceTitle}</span>
           </div>
         </div>
       </div>
@@ -651,11 +654,41 @@ function NowPlayingView({
                       {queue.map((item, qIdx) => (
                         <div
                           key={`${item.filePath}-${qIdx}`}
-                          className="now-playing-queue-row"
+                          className={`now-playing-queue-row ${draggedQueueIndex === qIdx ? 'is-dragging' : ''} ${dragOverQueueIndex === qIdx ? 'drag-over' : ''}`}
+                          draggable
+                          onDragStart={(e) => {
+                            setDraggedQueueIndex(qIdx)
+                            e.dataTransfer.effectAllowed = 'move'
+                            e.dataTransfer.setData('text/plain', `${qIdx}`)
+                          }}
+                          onDragOver={(e) => {
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                            if (dragOverQueueIndex !== qIdx) {
+                              setDragOverQueueIndex(qIdx)
+                            }
+                          }}
+                          onDragLeave={() => {
+                            if (dragOverQueueIndex === qIdx) {
+                              setDragOverQueueIndex(null)
+                            }
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            if (draggedQueueIndex !== null && draggedQueueIndex !== qIdx) {
+                              reorderQueue(draggedQueueIndex, qIdx)
+                            }
+                            setDraggedQueueIndex(null)
+                            setDragOverQueueIndex(null)
+                          }}
+                          onDragEnd={() => {
+                            setDraggedQueueIndex(null)
+                            setDragOverQueueIndex(null)
+                          }}
                           onClick={() => playTrack(item, queue)}
-                          title="Click to play"
+                          title="Click to play, drag handle to reorder"
                         >
-                          <div className="queue-row-drag-handle">
+                          <div className="queue-row-drag-handle" title="Drag to reorder">
                             <Equals size={16} weight="bold" />
                           </div>
                           <div className="queue-row-thumb">

@@ -72,6 +72,7 @@ export interface AudioContextType {
   removeFromQueue: (filePath: string) => void
   clearQueue: () => void
   shuffleQueue: () => void
+  reorderQueue: (fromIndex: number, toIndex: number) => void
 }
 
 export const AudioContext = createContext<AudioContextType | undefined>(undefined)
@@ -550,6 +551,25 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     })
   }, [currentTrack])
 
+  // Reorder Queue (Drag-and-Drop)
+  const reorderQueue = useCallback((fromIndex: number, toIndex: number) => {
+    setQueue((prev) => {
+      if (
+        fromIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex < 0 ||
+        toIndex >= prev.length ||
+        fromIndex === toIndex
+      ) {
+        return prev
+      }
+      const updated = [...prev]
+      const [movedItem] = updated.splice(fromIndex, 1)
+      updated.splice(toIndex, 0, movedItem)
+      return updated
+    })
+  }, [])
+
   // Stable refs for media session action handlers to prevent unnecessary re-binding
   const togglePlayRef = useRef(togglePlay)
   const prevTrackRef = useRef(prevTrack)
@@ -690,7 +710,8 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       addToQueue,
       removeFromQueue,
       clearQueue,
-      shuffleQueue
+      shuffleQueue,
+      reorderQueue
     }),
     [
       currentTrack,
@@ -715,7 +736,8 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       addToQueue,
       removeFromQueue,
       clearQueue,
-      shuffleQueue
+      shuffleQueue,
+      reorderQueue
     ]
   )
 
