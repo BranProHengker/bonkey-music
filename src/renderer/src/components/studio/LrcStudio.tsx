@@ -359,13 +359,13 @@ export default function LrcStudio({
         </div>
 
         {/* LRCLIB Search Input Bar */}
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-          <div className="search-input-wrapper" style={{ flex: 1, height: '40px' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div className="search-input-wrapper" style={{ flex: '1 1 220px', minWidth: '0', height: '40px' }}>
             <MagnifyingGlass size={18} weight="light" />
             <input
               type="text"
               className="search-input"
-              placeholder="Search song title and artist on LRCLIB (e.g. Yorushika - Matasaburo)..."
+              placeholder="Search title and artist (e.g. Yorushika - Matasaburo)..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => {
@@ -383,7 +383,8 @@ export default function LrcStudio({
               height: '40px',
               padding: '0 18px',
               borderRadius: '8px',
-              fontSize: '13px'
+              fontSize: '13px',
+              whiteSpace: 'nowrap'
             }}
           >
             {isSearching ? <ArrowClockwise size={16} className="animate-spin" /> : <MagnifyingGlass size={16} weight="bold" />}

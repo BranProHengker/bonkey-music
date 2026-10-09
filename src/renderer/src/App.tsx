@@ -366,19 +366,24 @@ export default function App(): React.JSX.Element {
       }
 
       let lib = await window.api.loadLibrary()
-      if ((!lib || lib.length === 0) && window.api.autoScanAudio) {
-        try {
-          const autoScanned = await window.api.autoScanAudio()
-          if (autoScanned && autoScanned.length > 0) {
-            lib = autoScanned
+      if (lib && Array.isArray(lib) && lib.length > 0) {
+        setTracks(lib as TrackMeta[])
+      } else if (window.api.autoScanAudio) {
+        // Run auto-scan in background without freezing UI
+        setIsScanning(true)
+        window.api.autoScanAudio().then((scanned) => {
+          if (scanned && Array.isArray(scanned) && scanned.length > 0) {
+            setTracks(scanned as TrackMeta[])
           }
-        } catch {}
+        }).catch((err) => {
+          console.warn('Background auto-scan error:', err)
+        }).finally(() => {
+          setIsScanning(false)
+        })
       }
 
-      if (lib && Array.isArray(lib)) {
-        setTracks(lib as TrackMeta[])
         // Auto-recover folder from indexed tracks if settings was empty
-        if (!currentFolder && lib.length > 0 && lib[0]?.filePath) {
+        if (!currentFolder && lib && Array.isArray(lib) && lib.length > 0 && lib[0]?.filePath) {
           const firstPath = lib[0].filePath
           const separator = firstPath.includes('/') ? '/' : '\\'
           const folderPart = firstPath.substring(0, firstPath.lastIndexOf(separator))
@@ -393,7 +398,6 @@ export default function App(): React.JSX.Element {
           }
         }
       }
-    }
     loadData()
   }, [])
 
@@ -430,6 +434,28 @@ export default function App(): React.JSX.Element {
       }
     } catch (err) {
       console.error('Scan error:', err)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
+  const handleAutoScan = async () => {
+    if (isScanning || !window.api.autoScanAudio) return
+    setIsScanning(true)
+    try {
+      const scanned = await window.api.autoScanAudio()
+      if (scanned && Array.isArray(scanned) && scanned.length > 0) {
+        setTracks(scanned as TrackMeta[])
+        const settings = await window.api.loadSettings()
+        if (settings && Array.isArray(settings.libraryFolders)) {
+          setLibraryFolders(settings.libraryFolders as string[])
+        }
+        if (settings && typeof settings.libraryFolder === 'string') {
+          setLibraryFolder(settings.libraryFolder)
+        }
+      }
+    } catch (err) {
+      console.error('Auto-scan error:', err)
     } finally {
       setIsScanning(false)
     }
@@ -1179,12 +1205,18 @@ export default function App(): React.JSX.Element {
             </div>
             <h2>Setup Your Library</h2>
             <p>
-              To get started, select the folder on your computer where your local music files are stored. We'll automatically index your tracks.
+              Pindai musik otomatis dari penyimpanan perangkat Anda, atau pilih folder lokal secara manual.
             </p>
-            <button className="btn-primary" onClick={handleSelectAndAddFolder} style={{ marginTop: '8px' }}>
-              <FolderOpen size={18} weight="light" />
-              <span>Select Music Folder</span>
-            </button>
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '12px' }}>
+              <button className="btn-primary" onClick={handleAutoScan} disabled={isScanning}>
+                <ArrowClockwise size={18} className={isScanning ? 'animate-spin' : ''} />
+                <span>{isScanning ? 'Memindai Musik...' : 'Pindai Musik Otomatis'}</span>
+              </button>
+              <button className="btn-control" onClick={handleSelectAndAddFolder} disabled={isScanning}>
+                <FolderOpen size={18} weight="light" />
+                <span>Pilih Folder Manual</span>
+              </button>
+            </div>
           </div>
         ) : (currentView === 'home' && !activePlaylist && !activeAlbum && !searchQuery) ? (
           <DashboardHome

@@ -56,8 +56,7 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
     }
 }
 
-#[tauri::command]
-pub fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
+fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
     let mut candidate_dirs: Vec<PathBuf> = Vec::new();
 
     // 1. Android public directories
@@ -66,6 +65,8 @@ pub fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
         "/storage/emulated/0/Download",
         "/storage/emulated/0/Audio",
         "/storage/emulated/0/Podcasts",
+        "/storage/emulated/0/Recordings",
+        "/storage/emulated/0/Documents",
         "/sdcard/Music",
         "/sdcard/Download",
     ];
@@ -91,7 +92,14 @@ pub fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
     ];
 
     for root in &candidate_dirs {
-        for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+        for entry in WalkDir::new(root)
+            .into_iter()
+            .filter_entry(|e| {
+                let name = e.file_name().to_string_lossy();
+                !name.starts_with('.') && name != "Android" && name != "node_modules"
+            })
+            .filter_map(|e| e.ok())
+        {
             let p = entry.path();
             if p.is_file() {
                 if let Some(ext) = p
@@ -131,15 +139,17 @@ pub fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
 }
 
 #[tauri::command]
+pub async fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
+    tokio::task::spawn_blocking(move || {
+        auto_scan_audio_sync()
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
 pub fn load_library() -> Result<Vec<TrackMeta>, String> {
     let mut tracks = read_library_from_disk();
-    if tracks.is_empty() {
-        if let Ok(auto_scanned) = auto_scan_audio() {
-            if !auto_scanned.is_empty() {
-                tracks = auto_scanned;
-            }
-        }
-    }
     let port = crate::services::audio_server::get_server_port();
     let mut needs_migration = false;
 

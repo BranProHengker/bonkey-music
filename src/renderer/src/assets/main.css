@@ -6997,18 +6997,17 @@ body.theme-lunio .player-bar .btn-control.active {
   body.theme-lunio .app-container,
   .app-container {
     grid-template-columns: 1fr !important;
+    grid-template-rows: 1fr !important;
     grid-template-areas:
-      "header"
       "main" !important;
-    padding: max(8px, env(safe-area-inset-top, 0px)) 12px calc(140px + env(safe-area-inset-bottom, 0px)) 12px !important;
-    gap: 10px !important;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 12px calc(140px + env(safe-area-inset-bottom, 0px)) 12px !important;
+    gap: 0 !important;
   }
 
   .app-header {
-    padding-left: 14px !important;
-    padding-right: 14px !important;
-    padding-top: env(safe-area-inset-top, 0px) !important;
+    display: none !important;
   }
+
 
   .main-content {
     padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important; /* Space for the floating double capsules */

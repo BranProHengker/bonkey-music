@@ -6,7 +6,8 @@ import {
   Compass,
   Books,
   MagnifyingGlass,
-  MusicNotes
+  MusicNotes,
+  House
 } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
 
@@ -110,10 +111,10 @@ function MobileBottomDock({
           type="button"
           className={`mobile-nav-tab ${isHomeActive ? 'active' : ''}`}
           onClick={() => handleNavClick('home')}
-          title="Play / Home"
+          title="Home"
         >
-          <Play size={17} weight={isHomeActive ? 'fill' : 'bold'} />
-          <span>Play</span>
+          <House size={17} weight={isHomeActive ? 'fill' : 'bold'} />
+          <span>Home</span>
         </button>
 
         <button
