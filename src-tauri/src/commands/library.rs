@@ -49,6 +49,20 @@ fn save_library_to_disk(tracks: &[TrackMeta]) -> Result<(), String> {
     Ok(())
 }
 
+pub fn is_junk_audio_path(path_str: &str) -> bool {
+    let lower = path_str.to_lowercase();
+    lower.contains("/ringtones")
+        || lower.contains("\\ringtones")
+        || lower.contains("/notifications")
+        || lower.contains("\\notifications")
+        || lower.contains("/alarms")
+        || lower.contains("\\alarms")
+        || lower.contains("/system/media")
+        || lower.contains("/product/media")
+        || lower.contains("/android/data")
+        || lower.contains("whatsapp voice notes")
+}
+
 fn read_library_from_disk() -> Vec<TrackMeta> {
     let path = get_library_file_path();
     if !path.exists() {
@@ -56,7 +70,10 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
     }
     match fs::read_to_string(&path) {
         Ok(data) => match serde_json::from_str::<Vec<TrackMeta>>(&data) {
-            Ok(tracks) => tracks,
+            Ok(mut tracks) => {
+                tracks.retain(|t| !is_junk_audio_path(&t.file_path));
+                tracks
+            }
             Err(e) => {
                 eprintln!("[Bonkey Music] Failed to parse library.json: {}", e);
                 Vec::new()
@@ -79,6 +96,9 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
         if let Ok(content) = fs::read_to_string(&mediastore_file) {
             if let Ok(tracks) = serde_json::from_str::<Vec<TrackMeta>>(&content) {
                 for track in tracks {
+                    if is_junk_audio_path(&track.file_path) {
+                        continue;
+                    }
                     let p = Path::new(&track.file_path);
                     if p.exists() {
                         if let Ok(meta) = read_track_metadata(p) {
@@ -150,7 +170,13 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
             .into_iter()
             .filter_entry(|e| {
                 let name = e.file_name().to_string_lossy();
-                !name.starts_with('.') && name != "Android" && name != "node_modules"
+                let lower = name.to_lowercase();
+                !name.starts_with('.')
+                    && name != "Android"
+                    && name != "node_modules"
+                    && !lower.contains("ringtone")
+                    && !lower.contains("notification")
+                    && !lower.contains("alarm")
             })
             .filter_map(|e| e.ok())
         {
@@ -163,7 +189,7 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
                 {
                     if valid_exts.contains(&ext.as_str()) {
                         let path_str = p.to_string_lossy().to_string();
-                        if !scanned_tracks.iter().any(|t| t.file_path == path_str) {
+                        if !is_junk_audio_path(&path_str) && !scanned_tracks.iter().any(|t| t.file_path == path_str) {
                             if let Ok(meta) = read_track_metadata(p) {
                                 scanned_tracks.push(meta);
                             }
@@ -212,6 +238,7 @@ pub async fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
 #[tauri::command]
 pub fn load_library() -> Result<Vec<TrackMeta>, String> {
     let mut tracks = read_library_from_disk();
+    tracks.retain(|t| !is_junk_audio_path(&t.file_path));
     let port = crate::services::audio_server::get_server_port();
     let mut needs_migration = false;
 

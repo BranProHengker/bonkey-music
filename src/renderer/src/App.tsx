@@ -324,6 +324,22 @@ export default function App(): React.JSX.Element {
     }
   }, [goBack, goForward, togglePlay, playTrack, nextTrack, prevTrack, toggleShuffle, toggleRepeat, toggleMute, seekOffset, changeVolume])
 
+function isJunkTrack(track: TrackMeta): boolean {
+  const p = (track.filePath || '').toLowerCase()
+  return (
+    p.includes('/ringtones') ||
+    p.includes('\\ringtones') ||
+    p.includes('/notifications') ||
+    p.includes('\\notifications') ||
+    p.includes('/alarms') ||
+    p.includes('\\alarms') ||
+    p.includes('/system/media') ||
+    p.includes('/product/media') ||
+    p.includes('/android/data') ||
+    p.includes('whatsapp voice notes')
+  )
+}
+
   // ─── Save Settings Helper ───────────────────────────────────────────
   const persistSettings = async (updates: Record<string, unknown>) => {
     const settings = await window.api.loadSettings()
@@ -346,13 +362,16 @@ export default function App(): React.JSX.Element {
         if (jsonStr) {
           try {
             const parsed = JSON.parse(jsonStr)
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              setTracks(parsed as TrackMeta[])
-              if (window.api.saveLibrary) {
-                await window.api.saveLibrary(parsed as TrackMeta[])
+            if (Array.isArray(parsed)) {
+              const clean = (parsed as TrackMeta[]).filter(t => !isJunkTrack(t))
+              if (clean.length > 0) {
+                setTracks(clean)
+                if (window.api.saveLibrary) {
+                  await window.api.saveLibrary(clean)
+                }
+                setIsScanning(false)
+                return
               }
-              setIsScanning(false)
-              return
             }
           } catch (e) {
             console.error('[Bonkey Music] Failed to parse MediaStore JSON:', e)
@@ -364,7 +383,8 @@ export default function App(): React.JSX.Element {
       if (window.api.autoScanAudio) {
         const scanned = await window.api.autoScanAudio()
         if (scanned && Array.isArray(scanned) && scanned.length > 0) {
-          setTracks(scanned as TrackMeta[])
+          const clean = (scanned as TrackMeta[]).filter(t => !isJunkTrack(t))
+          setTracks(clean)
           const settings = await window.api.loadSettings()
           if (settings && Array.isArray(settings.libraryFolders)) {
             setLibraryFolders(settings.libraryFolders as string[])
@@ -380,6 +400,16 @@ export default function App(): React.JSX.Element {
       setIsScanning(false)
     }
   }
+
+  // ─── Android Resume Bridge Callback ─────────────────────────────────
+  useEffect(() => {
+    ;(window as any).__refreshAndroidLibrary = () => {
+      handleAutoScan()
+    }
+    return () => {
+      delete (window as any).__refreshAndroidLibrary
+    }
+  }, [])
 
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
@@ -416,7 +446,15 @@ export default function App(): React.JSX.Element {
 
       let lib = await window.api.loadLibrary()
       if (lib && Array.isArray(lib) && lib.length > 0) {
-        setTracks(lib as TrackMeta[])
+        const clean = (lib as TrackMeta[]).filter(t => !isJunkTrack(t))
+        if (clean.length > 0) {
+          setTracks(clean)
+          if (clean.length !== lib.length && window.api.saveLibrary) {
+            await window.api.saveLibrary(clean)
+          }
+        } else {
+          handleAutoScan()
+        }
       } else {
         // Run auto-scan in background if empty
         handleAutoScan()
