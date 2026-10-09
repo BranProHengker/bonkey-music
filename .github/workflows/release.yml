@@ -151,7 +151,22 @@ jobs:
             mapfile -t APK_FILES < <(find src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -type f)
           fi
           echo "Found APK files: ${APK_FILES[*]}"
-          gh release upload "${{ github.ref_name }}" "${APK_FILES[@]}" --clobber
+
+          UPLOAD_FILES=()
+          for apk in "${APK_FILES[@]}"; do
+            CLEAN_APK="src-tauri/gen/android/app/build/outputs/apk/Bonkey.Music_${{ github.ref_name }}_android.apk"
+            cp "$apk" "$CLEAN_APK"
+            UPLOAD_FILES+=("$CLEAN_APK")
+            UPLOAD_FILES+=("$apk")
+          done
+
+          if ! gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} does not exist yet. Creating entry..."
+            gh release create "${{ github.ref_name }}" --title "Bonkey Music ${{ github.ref_name }}" --notes "Release ${{ github.ref_name }}"
+          fi
+
+          gh release upload "${{ github.ref_name }}" "${UPLOAD_FILES[@]}" --clobber
+
 
 
 
