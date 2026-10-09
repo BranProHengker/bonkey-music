@@ -60,7 +60,7 @@ jobs:
           releaseName: 'Bonkey Music ${{ github.ref_name }}'
           releaseBody: |
             ## What's Changed in ${{ github.ref_name }}
-            - **100% Electron & UI Klasik Purge**: Pure Tauri v2 + React architecture, 0 Electron residue, pruned 285 unused dependencies.
+            - **Zero Electron (100% Pure Tauri v2 + Rust)**: Completely removed Electron and classic UI, 0 Electron residue, pruned 285 unused dependencies.
             - **Auto-Scan Audio System**: Automatic music detection targeting Android storage and desktop audio directories with no manual folder selection needed.
             - **Mobile-Responsive Ergonomics**: 2-tier floating pill dock, adaptive Now Playing sheet with swipe gesture, artist subtitles on mobile track rows, and Android safe-area insets.
             - **Discord RPC & Metadata Upgrades**: High-res remote cover art detection and embedded lyrics extraction.
@@ -99,7 +99,7 @@ jobs:
       - name: Install Rust & Android Targets
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+          targets: aarch64-linux-android
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -132,7 +132,7 @@ jobs:
           if [ -f "$MANIFEST" ]; then
             sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />' "$MANIFEST"
           fi
-          pnpm tauri android build --apk --debug
+          pnpm tauri android build --apk --debug --target aarch64
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
