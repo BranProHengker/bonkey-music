@@ -145,7 +145,12 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if ! gh release view "${{ github.ref_name }}" >/dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} does not exist yet. Creating entry..."
+            gh release create "${{ github.ref_name }}" --title "Bonkey Music ${{ github.ref_name }}" --notes "Release ${{ github.ref_name }}"
+          fi
           gh release upload "${{ github.ref_name }}" src-tauri/gen/android/app/build/outputs/apk/**/*.apk --clobber
+
 
 
 
