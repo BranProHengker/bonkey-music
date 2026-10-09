@@ -201,7 +201,7 @@ function DashboardHome({
                     <span className="top-song-rank">0{idx + 1}</span>
                     <div className="top-song-thumb">
                       {song.coverArt ? (
-                        <img src={song.coverArt} alt={song.title} />
+                        <img src={song.coverArt} alt={song.title} loading="lazy" decoding="async" />
                       ) : (
                         <MusicNotes size={16} weight="light" />
                       )}
@@ -243,7 +243,7 @@ function DashboardHome({
               >
                 <div className="album-card-thumb">
                   {album.coverArt ? (
-                    <img src={album.coverArt} alt={album.name} loading="lazy" />
+                    <img src={album.coverArt} alt={album.name} loading="lazy" decoding="async" />
                   ) : (
                     <div className="album-card-placeholder">
                       <MusicNotes size={40} weight="light" />

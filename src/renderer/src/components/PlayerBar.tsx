@@ -239,7 +239,7 @@ function PlayerBar({
       >
         <div className="player-art">
           {currentTrack?.coverArt ? (
-            <img src={currentTrack.coverArt} alt="Cover Art" />
+            <img src={currentTrack.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
           ) : (
             <MusicNotes size={22} weight="light" />
           )}

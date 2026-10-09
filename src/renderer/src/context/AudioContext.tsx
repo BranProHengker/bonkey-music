@@ -210,16 +210,40 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   }, [])
 
   // Throttled progress timer (100ms interval for fluid 10Hz updates without CPU spikes)
+  // When in background or phone screen locked (document.hidden), throttle to 1000ms to save CPU & battery
   useEffect(() => {
     if (!isPlaying) return
 
-    const intervalId = setInterval(() => {
-      if (audioRef.current) {
-        setCurrentTime(audioRef.current.currentTime)
-      }
-    }, 100)
+    let intervalId: NodeJS.Timeout | null = null
 
-    return () => clearInterval(intervalId)
+    const startTimer = (ms: number) => {
+      if (intervalId) clearInterval(intervalId)
+      intervalId = setInterval(() => {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime)
+        }
+      }, ms)
+    }
+
+    startTimer(typeof document !== 'undefined' && document.hidden ? 1000 : 100)
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        startTimer(1000)
+      } else {
+        if (audioRef.current) {
+          setCurrentTime(audioRef.current.currentTime)
+        }
+        startTimer(100)
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
   }, [isPlaying])
 
   // Periodically save play position

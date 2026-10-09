@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback, memo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, memo } from 'react'
 import {
   Play,
   SpeakerHigh,
@@ -144,7 +144,7 @@ const TrackRow = memo(function TrackRow({
         {viewMode === 'detailed' ? (
           <div className="detailed-art-box">
             {track.coverArt ? (
-              <img src={track.coverArt} alt="Cover Art" />
+              <img src={track.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
             ) : (
               <MusicNotes size={20} weight="light" />
             )}
@@ -159,7 +159,7 @@ const TrackRow = memo(function TrackRow({
         ) : (
           <div className="track-thumbnail">
             {track.coverArt ? (
-              <img src={track.coverArt} alt="Cover Art" />
+              <img src={track.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
             ) : (
               <MusicNotes size={16} weight="light" />
             )}
@@ -258,7 +258,7 @@ const TrackGridCard = memo(function TrackGridCard({
     >
       <div className="grid-card-art">
         {track.coverArt ? (
-          <img src={track.coverArt} alt={track.title} />
+          <img src={track.coverArt} alt={track.title} loading="lazy" decoding="async" />
         ) : (
           <div className="grid-card-placeholder">
             <MusicNotes size={42} weight="light" />
@@ -429,6 +429,35 @@ function TrackList({
 
   const favoritesSet = useMemo(() => new Set(favorites), [favorites])
 
+  // ─── Progressive Render Windowing (Virtual DOM Limiter) ───────────────
+  const [visibleCount, setVisibleCount] = useState(60)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    setVisibleCount(60)
+  }, [tracks])
+
+  useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel || visibleCount >= tracks.length) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setVisibleCount((prev) => Math.min(prev + 60, tracks.length))
+        }
+      },
+      { rootMargin: '400px' }
+    )
+
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [visibleCount, tracks.length])
+
+  const renderedTracks = useMemo(() => {
+    return tracks.slice(0, visibleCount)
+  }, [tracks, visibleCount])
+
   const renderSortIndicator = (field: 'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt') => {
     if (sortField !== field) return null
     return sortOrder === 'asc' ? ' ▲' : ' ▼'
@@ -484,7 +513,7 @@ function TrackList({
       {/* Grid Mode */}
       {viewMode === 'grid' ? (
         <div className="track-grid-container">
-          {tracks.map((track) => {
+          {renderedTracks.map((track) => {
             const isCurrent = currentTrack?.filePath === track.filePath
             const isLiked = favoritesSet.has(track.filePath)
             return (
@@ -529,7 +558,7 @@ function TrackList({
             <div style={{ justifySelf: 'center' }}>Actions</div>
           </div>
 
-          {tracks.map((track, index) => {
+          {renderedTracks.map((track, index) => {
             const isCurrent = currentTrack?.filePath === track.filePath
             const isLiked = favoritesSet.has(track.filePath)
 
@@ -554,6 +583,13 @@ function TrackList({
             )
           })}
         </>
+      )}
+
+      {/* Sentinel for progressive infinite rendering */}
+      {visibleCount < tracks.length && (
+        <div ref={sentinelRef} style={{ width: '100%', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)' }}>Memuat lagu lainnya...</span>
+        </div>
       )}
 
       {/* Apple Music Style Floating Popover (Fixed, Never Clipped) */}

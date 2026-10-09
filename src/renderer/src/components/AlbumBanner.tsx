@@ -92,7 +92,7 @@ export default function AlbumBanner({
         {/* Cover Art */}
         <div className="album-banner-cover">
           {coverArt ? (
-            <img src={coverArt} alt={albumName} />
+            <img src={coverArt} alt={albumName} loading="lazy" decoding="async" />
           ) : (
             <div className="album-banner-cover-placeholder">
               <MusicNotes size={64} weight="light" />

@@ -82,7 +82,7 @@ export default function PlaylistGrid({
         <div className="library-spotlight-card">
           <div className="spotlight-cover-container">
             {spotlightItem.coverArt ? (
-              <img src={spotlightItem.coverArt} alt={spotlightItem.title} className="spotlight-cover" />
+              <img src={spotlightItem.coverArt} alt={spotlightItem.title} className="spotlight-cover" loading="lazy" decoding="async" />
             ) : (
               <div className="spotlight-cover-placeholder">
                 <Disc size={44} weight="light" />
@@ -232,7 +232,7 @@ export default function PlaylistGrid({
               >
                 <div className="album-artwork-wrap">
                   {coverArt ? (
-                    <img src={coverArt} alt={playlist} className="album-artwork" loading="lazy" />
+                    <img src={coverArt} alt={playlist} className="album-artwork" loading="lazy" decoding="async" />
                   ) : (
                     <div className="album-artwork-placeholder" style={{ background: 'linear-gradient(135deg, #1e2230 0%, #11141e 100%)' }}>
                       <MusicNotes size={32} weight="light" color="var(--accent)" />
@@ -286,7 +286,7 @@ export default function PlaylistGrid({
               >
                 <div className="album-artwork-wrap">
                   {album.coverArt ? (
-                    <img src={album.coverArt} alt={album.name} className="album-artwork" loading="lazy" />
+                    <img src={album.coverArt} alt={album.name} className="album-artwork" loading="lazy" decoding="async" />
                   ) : (
                     <div className="album-artwork-placeholder">
                       <MusicNotes size={32} weight="light" />
