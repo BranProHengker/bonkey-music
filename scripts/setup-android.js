@@ -50,12 +50,15 @@ const genAndroidDir = path.resolve(__dirname, '../src-tauri/gen/android')
 const mainActivityPath = findFile(genAndroidDir, 'MainActivity.kt')
 
 if (mainActivityPath) {
-  const kotlinCode = `package com.bonkeymusic.app
+  const original = fs.readFileSync(mainActivityPath, 'utf8')
+  const packageMatch = original.match(/^package\s+([^\s;]+)/m)
+  const pkg = packageMatch ? packageMatch[1] : 'com.bonkeymusic.app'
+
+  const kotlinCode = `package ${pkg}
 
 import android.os.Build
 import android.os.Bundle
 import android.content.pm.PackageManager
-import app.tauri.plugin.TauriActivity
 
 class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
