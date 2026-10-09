@@ -4,12 +4,14 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release:
+  release-desktop:
+    name: Release Desktop (${{ matrix.platform }})
     permissions:
       contents: write
     strategy:
@@ -49,7 +51,7 @@ jobs:
       - name: Install Frontend Dependencies
         run: pnpm install
 
-      - name: Build and Release Tauri App
+      - name: Build and Release Tauri Desktop App
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,14 +59,82 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Bonkey Music ${{ github.ref_name }}'
           releaseBody: |
-            ## What's Changed in v2.2.4
-            - **Performance & CPU Optimization**: Decoupled high-frequency playback state via `AudioTimeContext` (re-render rate cut by ~93%), eliminating UI micro-stutters.
-            - **Stabilized Event Listeners**: Window listeners for global shortcuts, mouse drag, and volume wheel are now permanently stabilized with zero per-frame re-binding.
-            - **Virtualized & Memoized TrackList**: Added `TrackRow` memoization and Chromium `content-visibility: auto`, drastically reducing DOM overhead on large playlists.
-            - **Hardware-Composited Lyrics**: Removed CPU-heavy dynamic font blur filters in favor of pure GPU-accelerated opacity & transforms.
-            - **Cleaned Main Process IPC**: Throttled Discord RPC updates and silenced debug logging.
+            ## What's Changed in ${{ github.ref_name }}
+            - **100% Electron & UI Klasik Purge**: Pure Tauri v2 + React architecture, 0 Electron residue, pruned 285 unused dependencies.
+            - **Auto-Scan Audio System**: Automatic music detection targeting Android storage and desktop audio directories with no manual folder selection needed.
+            - **Mobile-Responsive Ergonomics**: 2-tier floating pill dock, adaptive Now Playing sheet with swipe gesture, artist subtitles on mobile track rows, and Android safe-area insets.
+            - **Discord RPC & Metadata Upgrades**: High-res remote cover art detection and embedded lyrics extraction.
+            - **Android APK Build Pipeline**: Cloud CI/CD build producing Android APK binaries.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
+
+  release-android:
+    name: Release Android (APK)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --install "ndk;26.1.10909125"
+          echo "NDK_HOME=${ANDROID_HOME}/ndk/26.1.10909125" >> $GITHUB_ENV
+
+      - name: Install Rust & Android Targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'pnpm'
+
+      - name: Install Frontend Dependencies
+        run: pnpm install
+
+      - name: Build Android APK
+        env:
+          NDK_HOME: ${{ env.NDK_HOME }}
+        run: |
+          pnpm tauri android init
+          MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            sed -i '/<application/i \    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />' "$MANIFEST"
+          fi
+          pnpm tauri android build --apk
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bonkey-music-android-apk
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+
+      - name: Upload APK to GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 

@@ -8,7 +8,9 @@ use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use tauri::http::{header, Response, StatusCode};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconEvent};
 use tauri::{Emitter, Manager};
 
@@ -168,36 +170,70 @@ pub fn run() {
         .setup(|app| {
             crate::services::audio_server::start_audio_server();
 
-            #[cfg(target_os = "linux")]
-            let has_indicator = unsafe {
-                libloading::Library::new("libayatana-appindicator3.so.1").is_ok()
-                    || libloading::Library::new("libappindicator3.so.1").is_ok()
-                    || libloading::Library::new("libayatana-appindicator3.so").is_ok()
-                    || libloading::Library::new("libappindicator3.so").is_ok()
-            };
-            #[cfg(not(target_os = "linux"))]
-            let has_indicator = true;
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            {
+                #[cfg(target_os = "linux")]
+                let has_indicator = unsafe {
+                    libloading::Library::new("libayatana-appindicator3.so.1").is_ok()
+                        || libloading::Library::new("libappindicator3.so.1").is_ok()
+                        || libloading::Library::new("libayatana-appindicator3.so").is_ok()
+                        || libloading::Library::new("libappindicator3.so").is_ok()
+                };
+                #[cfg(not(target_os = "linux"))]
+                let has_indicator = true;
 
-            if has_indicator {
-                let show_hide = MenuItem::with_id(app, "toggle_window", "Show / Hide Bonkey Music", true, None::<&str>)?;
-                let sep1 = PredefinedMenuItem::separator(app)?;
-                let play_pause = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
-                let next_track = MenuItem::with_id(app, "next_track", "Next Track", true, None::<&str>)?;
-                let prev_track = MenuItem::with_id(app, "prev_track", "Previous Track", true, None::<&str>)?;
-                let sep2 = PredefinedMenuItem::separator(app)?;
-                let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+                if has_indicator {
+                    let show_hide = MenuItem::with_id(app, "toggle_window", "Show / Hide Bonkey Music", true, None::<&str>)?;
+                    let sep1 = PredefinedMenuItem::separator(app)?;
+                    let play_pause = MenuItem::with_id(app, "play_pause", "Play / Pause", true, None::<&str>)?;
+                    let next_track = MenuItem::with_id(app, "next_track", "Next Track", true, None::<&str>)?;
+                    let prev_track = MenuItem::with_id(app, "prev_track", "Previous Track", true, None::<&str>)?;
+                    let sep2 = PredefinedMenuItem::separator(app)?;
+                    let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-                let menu = Menu::with_items(
-                    app,
-                    &[&show_hide, &sep1, &play_pause, &next_track, &prev_track, &sep2, &quit],
-                )?;
+                    let menu = Menu::with_items(
+                        app,
+                        &[&show_hide, &sep1, &play_pause, &next_track, &prev_track, &sep2, &quit],
+                    )?;
 
-                let mut builder = tauri::tray::TrayIconBuilder::with_id("main-tray")
-                    .menu(&menu)
-                    .show_menu_on_left_click(false)
-                    .on_menu_event(|app, event| {
-                        match event.id().as_ref() {
-                            "toggle_window" => {
+                    let mut builder = tauri::tray::TrayIconBuilder::with_id("main-tray")
+                        .menu(&menu)
+                        .show_menu_on_left_click(false)
+                        .on_menu_event(|app, event| {
+                            match event.id().as_ref() {
+                                "toggle_window" => {
+                                    if let Some(win) = app.get_webview_window("main") {
+                                        if win.is_visible().unwrap_or(false) {
+                                            let _ = win.hide();
+                                        } else {
+                                            let _ = win.show();
+                                            let _ = win.set_focus();
+                                        }
+                                    }
+                                }
+                                "play_pause" => {
+                                    let _ = app.emit("media-control", "play-pause");
+                                }
+                                "next_track" => {
+                                    let _ = app.emit("media-control", "next");
+                                }
+                                "prev_track" => {
+                                    let _ = app.emit("media-control", "prev");
+                                }
+                                "quit" => {
+                                    app.exit(0);
+                                }
+                                _ => {}
+                            }
+                        })
+                        .on_tray_icon_event(|tray, event| {
+                            if let TrayIconEvent::Click {
+                                button: MouseButton::Left,
+                                button_state: MouseButtonState::Up,
+                                ..
+                            } = event
+                            {
+                                let app = tray.app_handle();
                                 if let Some(win) = app.get_webview_window("main") {
                                     if win.is_visible().unwrap_or(false) {
                                         let _ = win.hide();
@@ -207,64 +243,34 @@ pub fn run() {
                                     }
                                 }
                             }
-                            "play_pause" => {
-                                let _ = app.emit("media-control", "play-pause");
-                            }
-                            "next_track" => {
-                                let _ = app.emit("media-control", "next");
-                            }
-                            "prev_track" => {
-                                let _ = app.emit("media-control", "prev");
-                            }
-                            "quit" => {
-                                app.exit(0);
-                            }
-                            _ => {}
-                        }
-                    })
-                    .on_tray_icon_event(|tray, event| {
-                        if let TrayIconEvent::Click {
-                            button: MouseButton::Left,
-                            button_state: MouseButtonState::Up,
-                            ..
-                        } = event
-                        {
-                            let app = tray.app_handle();
-                            if let Some(win) = app.get_webview_window("main") {
-                                if win.is_visible().unwrap_or(false) {
-                                    let _ = win.hide();
-                                } else {
-                                    let _ = win.show();
-                                    let _ = win.set_focus();
-                                }
-                            }
-                        }
-                    });
+                        });
 
-                if let Some(icon) = app.default_window_icon() {
-                    builder = builder.icon(icon.clone());
-                }
+                    if let Some(icon) = app.default_window_icon() {
+                        builder = builder.icon(icon.clone());
+                    }
 
-                if let Err(e) = builder.build(app) {
-                    eprintln!("[Bonkey Music] Failed to build tray icon: {}", e);
-                } else if let Some(main_window) = app.get_webview_window("main") {
-                    let win_clone = main_window.clone();
-                    main_window.on_window_event(move |event| {
-                        if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                            api.prevent_close();
-                            let _ = win_clone.hide();
-                        }
-                    });
+                    if let Err(e) = builder.build(app) {
+                        eprintln!("[Bonkey Music] Failed to build tray icon: {}", e);
+                    } else if let Some(main_window) = app.get_webview_window("main") {
+                        let win_clone = main_window.clone();
+                        main_window.on_window_event(move |event| {
+                            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                                api.prevent_close();
+                                let _ = win_clone.hide();
+                            }
+                        });
+                    }
+                } else {
+                    eprintln!("[Bonkey Music] Warning: System tray disabled because libayatana-appindicator is missing on this system.");
+                    eprintln!("[Bonkey Music] Arch Linux: run 'sudo pacman -S libayatana-appindicator'");
+                    eprintln!("[Bonkey Music] Ubuntu/Debian: run 'sudo apt install libayatana-appindicator3-1'");
                 }
-            } else {
-                eprintln!("[Bonkey Music] Warning: System tray disabled because libayatana-appindicator is missing on this system.");
-                eprintln!("[Bonkey Music] Arch Linux: run 'sudo pacman -S libayatana-appindicator'");
-                eprintln!("[Bonkey Music] Ubuntu/Debian: run 'sudo apt install libayatana-appindicator3-1'");
             }
 
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            auto_scan_audio,
             scan_folder,
             load_library,
             reset_library,

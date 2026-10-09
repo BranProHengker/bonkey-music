@@ -1,25 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 
 export function setupTauriBridge() {
   if (typeof window === 'undefined') return
-
-  // If already in electron preload, do nothing
-  if (window.api && !('__isTauri' in window.api)) return
-
-  const w = window as any
-  if (!w.electron) {
-    w.electron = {
-      ipcRenderer: {
-        on: (channel: string, listener: (_event: any, ...args: any[]) => void) => {
-          listen(channel, (event) => {
-            listener(event, event.payload)
-          })
-        },
-        removeAllListeners: (_channel: string) => {}
-      }
-    }
-  }
 
   let cachedAudioPort = 0
   const fetchAudioPort = () => {
@@ -53,6 +35,7 @@ export function setupTauriBridge() {
     },
 
     // Library & Settings
+    autoScanAudio: () => invoke('auto_scan_audio'),
     selectFolder: () => invoke('select_folder'),
     scanFolder: (path: string) => invoke('scan_folder', { path }),
     loadLibrary: () => invoke('load_library'),

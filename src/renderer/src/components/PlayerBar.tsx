@@ -17,6 +17,7 @@ import {
 } from '@phosphor-icons/react'
 import { useAudioEngine, useAudioTime } from '../hooks/useAudioEngine'
 import { TrackMeta } from '../context/AudioContext'
+import MobileBottomDock from './MobileBottomDock'
 
 interface PlayerBarProps {
   onToggleQueue?: () => void
@@ -31,6 +32,12 @@ interface PlayerBarProps {
   onAddToPlaylist?: (playlistName: string, track: TrackMeta) => void
   onAddToNewPlaylist?: (track: TrackMeta) => void
   onOpenNowPlaying?: () => void
+  currentView?: 'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
+  setCurrentView?: (view: 'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio') => void
+  activePlaylist?: string | null
+  activeAlbum?: string | null
+  onClearActiveFilters?: () => void
+  onSearchClick?: () => void
 }
 
 function PlayerBar({
@@ -45,7 +52,13 @@ function PlayerBar({
   onToggleFavorite,
   onAddToPlaylist,
   onAddToNewPlaylist,
-  onOpenNowPlaying
+  onOpenNowPlaying,
+  currentView,
+  setCurrentView,
+  activePlaylist,
+  activeAlbum,
+  onClearActiveFilters,
+  onSearchClick
 }: PlayerBarProps) {
   const {
     currentTrack,
@@ -215,7 +228,8 @@ function PlayerBar({
   }
 
   return (
-    <div className="player-bar">
+    <>
+      <div className="player-bar desktop-only-bar">
       {/* 1. Kiri: Informasi Lagu */}
       <div 
         className="player-track-info" 
@@ -451,7 +465,23 @@ function PlayerBar({
           </div>
         </div>
       </div>
-    </div>
+      </div>
+
+      {/* Mobile 2-Tier Floating Dock (Upper: Mini-Player, Lower: Nav-Bar) matching Foto 4 */}
+      <MobileBottomDock
+        currentTrack={currentTrack}
+        isPlaying={isPlaying}
+        onPlayPause={handlePlayClick}
+        onNext={nextTrack}
+        onOpenNowPlaying={onOpenNowPlaying || (() => {})}
+        currentView={currentView || 'home'}
+        setCurrentView={setCurrentView || (() => {})}
+        onSearchClick={onSearchClick || (() => {})}
+        activePlaylist={activePlaylist}
+        activeAlbum={activeAlbum}
+        onClearActiveFilters={onClearActiveFilters}
+      />
+    </>
   )
 }
 

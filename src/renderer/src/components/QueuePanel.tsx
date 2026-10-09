@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
-import { Trash, X, Shuffle, MagnifyingGlass, MusicNotes, Play } from '@phosphor-icons/react'
+import { Trash, X, Shuffle, MagnifyingGlass, MusicNotes } from '@phosphor-icons/react'
 import { TrackMeta } from '../hooks/useAudioEngine'
+import QueueItemRow from './QueueItemRow'
 
 interface QueuePanelProps {
   isOpen: boolean
@@ -15,6 +16,7 @@ interface QueuePanelProps {
   currentTrack: TrackMeta | null
   isPlaying: boolean
   queue: TrackMeta[]
+  onReorderQueue?: (fromIndex: number, toIndex: number) => void
 }
 
 export default function QueuePanel({
@@ -29,12 +31,51 @@ export default function QueuePanel({
   onPlayTrack,
   currentTrack,
   isPlaying,
-  queue
+  queue,
+  onReorderQueue
 }: QueuePanelProps) {
   const [searchVal, setSearchVal] = useState('')
   const [searchResults, setSearchResults] = useState<TrackMeta[]>([])
   const [showResults, setShowResults] = useState(false)
   const searchWrapperRef = useRef<HTMLDivElement>(null)
+
+  // Drag-and-drop state for reordering queue items
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null)
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null)
+
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedIndex(index)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `${index}`)
+  }
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dragOverIndex !== index) {
+      setDragOverIndex(index)
+    }
+  }
+
+  const handleDragLeave = (_e: React.DragEvent, index: number) => {
+    if (dragOverIndex === index) {
+      setDragOverIndex(null)
+    }
+  }
+
+  const handleDrop = (e: React.DragEvent, index: number) => {
+    e.preventDefault()
+    if (draggedIndex !== null && draggedIndex !== index && onReorderQueue) {
+      onReorderQueue(draggedIndex, index)
+    }
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null)
+    setDragOverIndex(null)
+  }
 
   // Format time (e.g. 182s -> 3:02)
   const formatTime = (secs: number) => {
@@ -139,57 +180,25 @@ export default function QueuePanel({
             </span>
           </div>
         ) : (
-          queue.map((track) => {
-            const isActive = currentTrack?.filePath === track.filePath
-            return (
-              <div
-                key={track.filePath}
-                className={`queue-item-row ${isActive ? 'active' : ''}`}
-                onClick={() => onPlayTrack(track)}
-                title={`Play ${track.title}`}
-              >
-                <div className="queue-item-thumb">
-                  {track.coverArt ? (
-                    <img src={track.coverArt} alt={track.title} loading="lazy" />
-                  ) : (
-                    <MusicNotes size={16} weight="light" />
-                  )}
-                  {isActive && isPlaying ? (
-                    <div className="queue-equalizer-overlay">
-                      <span className="eq-bar eq-1" />
-                      <span className="eq-bar eq-2" />
-                      <span className="eq-bar eq-3" />
-                    </div>
-                  ) : (
-                    <div className="queue-item-play-overlay">
-                      <Play size={12} weight="fill" />
-                    </div>
-                  )}
-                </div>
-                <div className="queue-item-details">
-                  <span className="queue-item-title" title={track.title}>
-                    {track.title}
-                  </span>
-                  <span className="queue-item-artist" title={track.artist}>
-                    {track.artist}
-                  </span>
-                </div>
-                <span className="queue-item-time">{formatTime(track.duration)}</span>
-                <button
-                  type="button"
-                  className="btn-queue-remove"
-                  title="Remove from queue"
-                  aria-label="Remove"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onRemoveFromQueue(track.filePath)
-                  }}
-                >
-                  <X size={13} weight="bold" />
-                </button>
-              </div>
-            )
-          })
+          queue.map((track, idx) => (
+            <QueueItemRow
+              key={`${track.filePath}-${idx}`}
+              track={track}
+              index={idx}
+              isCurrent={currentTrack?.filePath === track.filePath}
+              isPlaying={isPlaying}
+              isDragging={draggedIndex === idx}
+              isDragOver={dragOverIndex === idx}
+              onDragStart={onReorderQueue ? handleDragStart : undefined}
+              onDragOver={onReorderQueue ? handleDragOver : undefined}
+              onDragLeave={onReorderQueue ? handleDragLeave : undefined}
+              onDrop={onReorderQueue ? handleDrop : undefined}
+              onDragEnd={onReorderQueue ? handleDragEnd : undefined}
+              onPlay={onPlayTrack}
+              onRemove={onRemoveFromQueue}
+              formatTime={formatTime}
+            />
+          ))
         )}
       </div>
 

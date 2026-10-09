@@ -47,6 +47,7 @@ interface TrackListProps {
   onRemoveFromPlaylist?: (track: TrackMeta) => void
   currentPlaylistName?: string | null
   onReorderTracks?: (startIndex: number, endIndex: number) => void
+  isAlbumView?: boolean
 }
 
 interface TrackRowProps {
@@ -57,6 +58,7 @@ interface TrackRowProps {
   isLiked: boolean
   canReorder: boolean
   viewMode: 'detailed' | 'compact'
+  isAlbumView?: boolean
   onPlayTrack: (track: TrackMeta) => void
   onToggleFavorite: (filePath: string) => void
   onAddToQueue?: (track: TrackMeta) => void
@@ -73,6 +75,7 @@ const TrackRow = memo(function TrackRow({
   isLiked,
   canReorder,
   viewMode,
+  isAlbumView = false,
   onPlayTrack,
   onToggleFavorite,
   onAddToQueue,
@@ -82,7 +85,7 @@ const TrackRow = memo(function TrackRow({
 }: TrackRowProps) {
   return (
     <div
-      className={`track-row ${viewMode === 'detailed' ? 'detailed-row' : 'compact-row'} ${isCurrent ? 'playing' : ''}`}
+      className={`track-row ${viewMode === 'detailed' ? 'detailed-row' : 'compact-row'} ${isCurrent ? 'playing' : ''} ${isAlbumView ? 'is-album-mode' : ''}`}
       draggable={canReorder}
       onDragStart={(e) => {
         if (canReorder) {
@@ -117,6 +120,7 @@ const TrackRow = memo(function TrackRow({
         }
       }}
       onDoubleClick={() => onPlayTrack(track)}
+      onClick={() => onPlayTrack(track)}
       onContextMenu={(e) => onContextMenu(e, track)}
     >
       <div className="track-number" style={{ display: 'flex', alignItems: 'center' }}>
@@ -129,7 +133,7 @@ const TrackRow = memo(function TrackRow({
         ) : (
           <>
             <span className="track-number-value">{track.trackNumber || index + 1}</span>
-            <button className="track-row-play-icon" onClick={() => onPlayTrack(track)}>
+            <button className="track-row-play-icon" onClick={(e) => { e.stopPropagation(); onPlayTrack(track) }}>
               <Play size={14} weight="fill" />
             </button>
           </>
@@ -163,6 +167,7 @@ const TrackRow = memo(function TrackRow({
         )}
         <div className="track-title-container">
           <span className="track-title">{track.title}</span>
+          <span className="track-artist-sub">{track.artist || 'Unknown Artist'}</span>
           {viewMode === 'detailed' && track.lossless && (
             <span className="spec-badge-inline">LOSSLESS</span>
           )}
@@ -171,15 +176,18 @@ const TrackRow = memo(function TrackRow({
 
       <div className="track-artist-col">{track.artist}</div>
 
-      <div className="track-album">{track.album}</div>
-
-      <div className="track-genre">{track.genre || '-'}</div>
+      {!isAlbumView && (
+        <>
+          <div className="track-album">{track.album}</div>
+          <div className="track-genre">{track.genre || '-'}</div>
+        </>
+      )}
 
       <div className="track-duration" style={{ textAlign: 'right' }}>
         {formatDuration(track.duration)}
       </div>
 
-      <div style={{ justifySelf: 'center', display: 'flex', alignItems: 'center', gap: '12px' }}>
+      <div className="track-actions-col" style={{ justifySelf: 'end', display: 'flex', alignItems: 'center', gap: '8px' }}>
         {onAddToQueue && (
           <button
             className="btn-track-add-queue"
@@ -245,6 +253,7 @@ const TrackGridCard = memo(function TrackGridCard({
     <div
       className={`track-grid-card ${isCurrent ? 'playing' : ''}`}
       onDoubleClick={() => onPlayTrack(track)}
+      onClick={() => onPlayTrack(track)}
       onContextMenu={(e) => onContextMenu(e, track)}
     >
       <div className="grid-card-art">
@@ -337,7 +346,8 @@ function TrackList({
   onAddToNewPlaylist,
   onRemoveFromPlaylist,
   currentPlaylistName = null,
-  onReorderTracks
+  onReorderTracks,
+  isAlbumView = false
 }: TrackListProps) {
   const [viewMode, setViewMode] = useState<TrackViewMode>(() => {
     try {
@@ -433,7 +443,7 @@ function TrackList({
   }
 
   return (
-    <div className="track-list-container">
+    <div className={`track-list-container ${isAlbumView ? 'is-album-mode' : ''}`}>
       {/* Top Toolbar: Track Count Badge & Segmented View Switcher */}
       <div className="track-list-toolbar">
         <div className="track-list-count-badge">
@@ -495,7 +505,7 @@ function TrackList({
       ) : (
         <>
           {/* Table Headers for Detailed & Compact Modes */}
-          <div className={`track-list-header ${viewMode === 'detailed' ? 'detailed-header' : 'compact-header'}`}>
+          <div className={`track-list-header ${viewMode === 'detailed' ? 'detailed-header' : 'compact-header'} ${isAlbumView ? 'is-album-mode' : ''}`}>
             <div>#</div>
             <div role="button" onClick={() => onSort?.('title')}>
               Title{renderSortIndicator('title')}
@@ -503,12 +513,16 @@ function TrackList({
             <div role="button" onClick={() => onSort?.('artist')}>
               Artist{renderSortIndicator('artist')}
             </div>
-            <div role="button" onClick={() => onSort?.('album')}>
-              Album{renderSortIndicator('album')}
-            </div>
-            <div role="button" onClick={() => onSort?.('genre')}>
-              Genre{renderSortIndicator('genre')}
-            </div>
+            {!isAlbumView && (
+              <>
+                <div role="button" onClick={() => onSort?.('album')}>
+                  Album{renderSortIndicator('album')}
+                </div>
+                <div role="button" onClick={() => onSort?.('genre')}>
+                  Genre{renderSortIndicator('genre')}
+                </div>
+              </>
+            )}
             <div role="button" style={{ textAlign: 'right', justifyContent: 'flex-end' }} onClick={() => onSort?.('duration')}>
               Time{renderSortIndicator('duration')}
             </div>
@@ -529,6 +543,7 @@ function TrackList({
                 isLiked={isLiked}
                 canReorder={!!onReorderTracks}
                 viewMode={viewMode}
+                isAlbumView={isAlbumView}
                 onPlayTrack={onPlayTrack}
                 onToggleFavorite={onToggleFavorite}
                 onAddToQueue={onAddToQueue}

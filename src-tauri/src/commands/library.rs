@@ -57,8 +57,89 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
 }
 
 #[tauri::command]
+pub fn auto_scan_audio() -> Result<Vec<TrackMeta>, String> {
+    let mut candidate_dirs: Vec<PathBuf> = Vec::new();
+
+    // 1. Android public directories
+    let android_paths = [
+        "/storage/emulated/0/Music",
+        "/storage/emulated/0/Download",
+        "/storage/emulated/0/Audio",
+        "/storage/emulated/0/Podcasts",
+        "/sdcard/Music",
+        "/sdcard/Download",
+    ];
+    for p in android_paths {
+        let path = PathBuf::from(p);
+        if path.exists() && path.is_dir() {
+            candidate_dirs.push(path);
+        }
+    }
+
+    // 2. Desktop standard audio directory
+    if candidate_dirs.is_empty() {
+        if let Some(audio_dir) = dirs::audio_dir() {
+            if audio_dir.exists() {
+                candidate_dirs.push(audio_dir);
+            }
+        }
+    }
+
+    let mut scanned_tracks = Vec::new();
+    let valid_exts = [
+        "mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff",
+    ];
+
+    for root in &candidate_dirs {
+        for entry in WalkDir::new(root).into_iter().filter_map(|e| e.ok()) {
+            let p = entry.path();
+            if p.is_file() {
+                if let Some(ext) = p
+                    .extension()
+                    .and_then(|s| s.to_str())
+                    .map(|s| s.to_lowercase())
+                {
+                    if valid_exts.contains(&ext.as_str()) {
+                        if let Ok(meta) = read_track_metadata(p) {
+                            scanned_tracks.push(meta);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if scanned_tracks.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let mut existing = read_library_from_disk();
+    for track in scanned_tracks {
+        if let Some(pos) = existing.iter().position(|t| t.file_path == track.file_path) {
+            existing[pos] = track;
+        } else {
+            existing.push(track);
+        }
+    }
+
+    save_library_to_disk(&existing)?;
+    for dir in &candidate_dirs {
+        save_folder_to_settings(&dir.to_string_lossy());
+    }
+
+    Ok(existing)
+}
+
+#[tauri::command]
 pub fn load_library() -> Result<Vec<TrackMeta>, String> {
     let mut tracks = read_library_from_disk();
+    if tracks.is_empty() {
+        if let Ok(auto_scanned) = auto_scan_audio() {
+            if !auto_scanned.is_empty() {
+                tracks = auto_scanned;
+            }
+        }
+    }
     let port = crate::services::audio_server::get_server_port();
     let mut needs_migration = false;
 
@@ -277,10 +358,22 @@ pub fn get_lyrics(audio_file_path: String) -> Result<Option<String>, String> {
     let p = Path::new(&audio_file_path);
     let lrc_path = p.with_extension("lrc");
     if lrc_path.exists() {
-        return fs::read_to_string(lrc_path)
-            .map(Some)
-            .map_err(|e| e.to_string());
+        if let Ok(content) = fs::read_to_string(lrc_path) {
+            return Ok(Some(content));
+        }
     }
+
+    if p.exists() {
+        if let Ok(tagged_file) = lofty::probe::Probe::open(p).and_then(|pr| pr.read()) {
+            use lofty::file::TaggedFileExt;
+            if let Some(tag) = tagged_file.primary_tag().or_else(|| tagged_file.first_tag()) {
+                if let Some(lyrics) = tag.get_string(&lofty::tag::ItemKey::Lyrics) {
+                    return Ok(Some(lyrics.to_string()));
+                }
+            }
+        }
+    }
+
     Ok(None)
 }
 

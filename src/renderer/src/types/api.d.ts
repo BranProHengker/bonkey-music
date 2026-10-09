@@ -1,5 +1,3 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
-
 export interface OnlineTrack {
   id: string
   title: string
@@ -83,7 +81,8 @@ export interface StudioAPI {
   selectFolderToInspect: () => Promise<string[]>
 }
 
-interface MusicAPI {
+export interface MusicAPI {
+  autoScanAudio: () => Promise<TrackMeta[]>
   selectFolder: () => Promise<string | null>
   scanFolder: (path: string) => Promise<TrackMeta[]>
   loadLibrary: () => Promise<TrackMeta[]>
@@ -99,10 +98,12 @@ interface MusicAPI {
   removeLibraryFolder: (path: string) => Promise<TrackMeta[]>
   selectImage: () => Promise<string | null>
   openFileLocation: (filePath: string) => Promise<boolean>
+  getAudioUrl?: (filePath: string) => string
+  getAudioPort?: () => Promise<number>
   studio: StudioAPI
 }
 
-interface TrackMeta {
+export interface TrackMeta {
   filePath: string
   title: string
   artist: string
@@ -122,7 +123,6 @@ interface TrackMeta {
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     api: MusicAPI
   }
 }

@@ -55,12 +55,18 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
 
     let port = crate::services::audio_server::get_server_port();
     let has_embedded_pic = tag.map(|t| !t.pictures().is_empty()).unwrap_or(false);
-    let cover_art = if has_embedded_pic
-        || path
-            .parent()
-            .map(|p| p.join("cover.jpg").exists() || p.join("folder.jpg").exists())
-            .unwrap_or(false)
-    {
+    let has_folder_pic = path
+        .parent()
+        .map(|p| {
+            p.join("cover.jpg").exists()
+                || p.join("cover.png").exists()
+                || p.join("folder.jpg").exists()
+                || p.join("folder.png").exists()
+                || p.join("front.jpg").exists()
+                || p.join("front.png").exists()
+        })
+        .unwrap_or(false);
+    let cover_art = if has_embedded_pic || has_folder_pic {
         Some(format!(
             "http://127.0.0.1:{}/cover?path={}",
             port,

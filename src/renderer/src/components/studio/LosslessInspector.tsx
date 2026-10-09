@@ -16,7 +16,7 @@ import {
   StopCircle,
   ChartBar
 } from '@phosphor-icons/react'
-import type { LosslessInspectionResult } from '../../../../preload/index.d'
+import type { LosslessInspectionResult } from '../../types/api'
 import type { TrackMeta } from '../../hooks/useAudioEngine'
 
 interface LosslessInspectorProps {
@@ -121,7 +121,7 @@ export default function LosslessInspector({
             const newItems = chunkResults.filter((r) => !existingPaths.has(r.filePath))
             return [...prev, ...newItems]
           })
-          setSelectedResult((prev) => prev || chunkResults[0])
+          setSelectedResult((prev: LosslessInspectionResult | null) => prev || chunkResults[0])
         }
       }
     } catch (err: any) {
@@ -1027,7 +1027,7 @@ export default function LosslessInspector({
                 position: 'relative'
               }}
             >
-              {selectedResult.spectrumBins.map((val, idx) => {
+              {selectedResult.spectrumBins.map((val: number, idx: number) => {
                 const maxKhz = selectedResult.sampleRate / 2000
                 const curKhz = (idx / selectedResult.spectrumBins.length) * maxKhz
                 const isAboveCutoff = curKhz > selectedResult.estimatedCutoffKhz

@@ -249,6 +249,8 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
         w.api.updateDiscordStatus({
           title: currentTrack?.title || null,
           artist: currentTrack?.artist || null,
+          album: currentTrack?.album || null,
+          coverArt: currentTrack?.coverArt || null,
           duration: duration,
           currentTime: curTime,
           isPlaying: isPlaying && currentTrack !== null

@@ -15,20 +15,47 @@ fn fetch_online_artwork(
         artist
     };
     let term = format!("{} {}", title, clean_artist).trim().to_string();
-    let url = format!(
+
+    // 1. Try iTunes Search API
+    let itunes_url = format!(
         "https://itunes.apple.com/search?term={}&entity=song&limit=1",
         urlencoding::encode(&term)
     );
 
-    let resp = http_client.get(&url).send().ok()?;
-    let json: serde_json::Value = resp.json().ok()?;
-    let artwork = json
-        .get("results")?
-        .get(0)?
-        .get("artworkUrl100")?
-        .as_str()?;
+    if let Ok(resp) = http_client.get(&itunes_url).send() {
+        if let Ok(json) = resp.json::<serde_json::Value>() {
+            if let Some(artwork) = json
+                .get("results")
+                .and_then(|r| r.get(0))
+                .and_then(|t| t.get("artworkUrl100"))
+                .and_then(|u| u.as_str())
+            {
+                return Some(artwork.replace("100x100bb.jpg", "512x512bb.jpg"));
+            }
+        }
+    }
 
-    Some(artwork.replace("100x100bb.jpg", "512x512bb.jpg"))
+    // 2. Fallback to Deezer Search API
+    let deezer_url = format!(
+        "https://api.deezer.com/search?q={}&limit=1",
+        urlencoding::encode(&term)
+    );
+
+    if let Ok(resp) = http_client.get(&deezer_url).send() {
+        if let Ok(json) = resp.json::<serde_json::Value>() {
+            if let Some(artwork) = json
+                .get("data")
+                .and_then(|d| d.get(0))
+                .and_then(|t| t.get("album"))
+                .and_then(|a| a.get("cover_xl").or_else(|| a.get("cover_big")).or_else(|| a.get("cover_medium")))
+                .and_then(|u| u.as_str())
+            {
+                return Some(artwork.to_string());
+            }
+        }
+    }
+
+    None
 }
 
 pub struct DiscordService {
@@ -105,23 +132,35 @@ impl DiscordService {
                         format!("by {} • Paused", artist)
                     };
 
-                    let cache_key = format!("{} - {}", artist, title);
-                    let cover_url = artwork_cache
-                        .entry(cache_key)
-                        .or_insert_with(|| fetch_online_artwork(&http_client, title, artist))
-                        .clone();
+                    let remote_cover = latest_data
+                        .get("coverArt")
+                        .and_then(|v| v.as_str())
+                        .filter(|url| {
+                            (url.starts_with("http://") || url.starts_with("https://"))
+                                && !url.contains("127.0.0.1")
+                                && !url.contains("localhost")
+                        });
+
+                    let cover_url = if let Some(rc) = remote_cover {
+                        Some(rc.to_string())
+                    } else {
+                        let cache_key = format!("{} - {}", artist, title);
+                        artwork_cache
+                            .entry(cache_key)
+                            .or_insert_with(|| fetch_online_artwork(&http_client, title, artist))
+                            .clone()
+                    };
 
                     let large_img = cover_url.as_deref().unwrap_or("logo_app");
+                    let album = latest_data
+                        .get("album")
+                        .and_then(|v| v.as_str())
+                        .filter(|s| !s.trim().is_empty());
+                    let large_text = album.unwrap_or(title);
 
-                    let mut assets = activity::Assets::new()
+                    let assets = activity::Assets::new()
                         .large_image(large_img)
-                        .large_text(title);
-
-                    if is_playing {
-                        assets = assets.small_image("play_icon").small_text("Playing");
-                    } else {
-                        assets = assets.small_image("pause_icon").small_text("Paused");
-                    }
+                        .large_text(large_text);
 
                     let mut act = activity::Activity::new()
                         .activity_type(activity::ActivityType::Listening)

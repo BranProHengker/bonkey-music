@@ -14,7 +14,7 @@ import {
   Info,
   Disc
 } from '@phosphor-icons/react'
-import type { LrcSearchResult } from '../../../../preload/index.d'
+import type { LrcSearchResult } from '../../types/api'
 import { type TrackMeta, useAudioTime } from '../../hooks/useAudioEngine'
 
 interface LrcStudioProps {

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Bonkey Music",
-  "version": "2.2.4",
+  "version": "2.3.0",
   "identifier": "com.bonkeymusic.app",
   "build": {
     "frontendDist": "../out/renderer",
@@ -16,8 +16,8 @@
         "title": "Bonkey Music",
         "width": 1200,
         "height": 800,
-        "minWidth": 900,
-        "minHeight": 600,
+        "minWidth": 380,
+        "minHeight": 500,
         "resizable": true,
         "fullscreen": false
       }

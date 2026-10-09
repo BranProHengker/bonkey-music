@@ -21,10 +21,10 @@ import {
   RepeatOnce,
   PlusCircle,
   FolderOpen,
-  Link,
-  Equals
+  Link
 } from '@phosphor-icons/react'
 import { TrackMeta, useAudioEngine, useAudioTime } from '../hooks/useAudioEngine'
+import QueueItemRow from './QueueItemRow'
 
 interface NowPlayingViewProps {
   currentTrack: TrackMeta | null
@@ -211,6 +211,40 @@ function NowPlayingView({
     }
   }, [handleDragMove, handleDragEnd])
 
+  // Empty-space drag down to dismiss handlers (any empty space in player body)
+  const handleOverlayMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.button !== 0) return
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          'button, input, select, textarea, a, .queue-unified-row, .now-playing-queue-row, .queue-row-drag-handle, .now-playing-progress-wrapper, .now-playing-volume-bar, .now-playing-lyrics-container, .track-dropdown-menu, .now-playing-options-wrapper, .now-playing-playlist-wrapper, .now-playing-bottom-bar, .now-playing-top-actions, .now-playing-queue-scrollable'
+        )
+      ) {
+        return
+      }
+      handleDragStart(e.clientY)
+    },
+    [handleDragStart]
+  )
+
+  const handleOverlayTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      const target = e.target as HTMLElement
+      if (
+        target.closest(
+          'button, input, select, textarea, a, .queue-unified-row, .now-playing-queue-row, .queue-row-drag-handle, .now-playing-progress-wrapper, .now-playing-volume-bar, .now-playing-lyrics-container, .track-dropdown-menu, .now-playing-options-wrapper, .now-playing-playlist-wrapper, .now-playing-bottom-bar, .now-playing-top-actions, .now-playing-queue-scrollable'
+        )
+      ) {
+        return
+      }
+      if (e.touches[0]) {
+        handleDragStart(e.touches[0].clientY)
+      }
+    },
+    [handleDragStart]
+  )
+
   // Close with Escape key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -378,6 +412,8 @@ function NowPlayingView({
     <div
       ref={overlayRef}
       className={`now-playing-overlay ${isClosing ? 'closing' : ''}`}
+      onMouseDown={handleOverlayMouseDown}
+      onTouchStart={handleOverlayTouchStart}
     >
       {/* Blurred background cover art */}
       <div
@@ -594,7 +630,7 @@ function NowPlayingView({
           <div className="now-playing-art-col">
             <div className="now-playing-art-wrapper">
               {coverArtSrc ? (
-                <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-main-art" />
+                <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-main-art" draggable={false} />
               ) : (
                 <div className="now-playing-art-placeholder">
                   <MusicNotes size={90} weight="thin" />
@@ -652,31 +688,35 @@ function NowPlayingView({
                   ) : (
                     <div className="now-playing-queue-list">
                       {queue.map((item, qIdx) => (
-                        <div
+                        <QueueItemRow
                           key={`${item.filePath}-${qIdx}`}
-                          className={`now-playing-queue-row ${draggedQueueIndex === qIdx ? 'is-dragging' : ''} ${dragOverQueueIndex === qIdx ? 'drag-over' : ''}`}
-                          draggable
-                          onDragStart={(e) => {
-                            setDraggedQueueIndex(qIdx)
+                          track={item}
+                          index={qIdx}
+                          isCurrent={currentTrack?.filePath === item.filePath}
+                          isPlaying={isPlaying}
+                          isDragging={draggedQueueIndex === qIdx}
+                          isDragOver={dragOverQueueIndex === qIdx}
+                          onDragStart={(e, idx) => {
+                            setDraggedQueueIndex(idx)
                             e.dataTransfer.effectAllowed = 'move'
-                            e.dataTransfer.setData('text/plain', `${qIdx}`)
+                            e.dataTransfer.setData('text/plain', `${idx}`)
                           }}
-                          onDragOver={(e) => {
+                          onDragOver={(e, idx) => {
                             e.preventDefault()
                             e.dataTransfer.dropEffect = 'move'
-                            if (dragOverQueueIndex !== qIdx) {
-                              setDragOverQueueIndex(qIdx)
+                            if (dragOverQueueIndex !== idx) {
+                              setDragOverQueueIndex(idx)
                             }
                           }}
-                          onDragLeave={() => {
-                            if (dragOverQueueIndex === qIdx) {
+                          onDragLeave={(_e, idx) => {
+                            if (dragOverQueueIndex === idx) {
                               setDragOverQueueIndex(null)
                             }
                           }}
-                          onDrop={(e) => {
+                          onDrop={(e, idx) => {
                             e.preventDefault()
-                            if (draggedQueueIndex !== null && draggedQueueIndex !== qIdx) {
-                              reorderQueue(draggedQueueIndex, qIdx)
+                            if (draggedQueueIndex !== null && draggedQueueIndex !== idx) {
+                              reorderQueue(draggedQueueIndex, idx)
                             }
                             setDraggedQueueIndex(null)
                             setDragOverQueueIndex(null)
@@ -685,35 +725,10 @@ function NowPlayingView({
                             setDraggedQueueIndex(null)
                             setDragOverQueueIndex(null)
                           }}
-                          onClick={() => playTrack(item, queue)}
-                          title="Click to play, drag handle to reorder"
-                        >
-                          <div className="queue-row-drag-handle" title="Drag to reorder">
-                            <Equals size={16} weight="bold" />
-                          </div>
-                          <div className="queue-row-thumb">
-                            {item.coverArt ? (
-                              <img src={item.coverArt} alt={item.title} />
-                            ) : (
-                              <MusicNotes size={16} weight="light" />
-                            )}
-                          </div>
-                          <div className="queue-row-info">
-                            <span className="queue-row-title">{item.title}</span>
-                            <span className="queue-row-artist">{item.artist || 'Unknown Artist'}</span>
-                          </div>
-                          <button
-                            type="button"
-                            className="queue-row-remove-btn"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              removeFromQueue(item.filePath)
-                            }}
-                            title="Remove from queue"
-                          >
-                            <X size={15} weight="bold" />
-                          </button>
-                        </div>
+                          onPlay={(t) => playTrack(t, queue)}
+                          onRemove={removeFromQueue}
+                          formatTime={formatTime}
+                        />
                       ))}
                     </div>
                   )}

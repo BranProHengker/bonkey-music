@@ -27,6 +27,7 @@ import LyricsView from './components/LyricsView'
 import NowPlayingView from './components/NowPlayingView'
 import StudioHub from './components/studio/StudioHub'
 import DashboardHome from './components/DashboardHome'
+import AlbumBanner from './components/AlbumBanner'
 import { useAudioEngine, TrackMeta } from './hooks/useAudioEngine'
 import { recordTrackPlay, recordListeningDuration } from './lib/listeningStats'
 
@@ -68,32 +69,18 @@ export default function App(): React.JSX.Element {
     shuffleQueue,
     seek,
     seekOffset,
-    toggleMute
+    toggleMute,
+    reorderQueue
   } = useAudioEngine()
 
-  // ─── Theme State ─────────────────────────────────────────────────────
-  const [theme, setTheme] = useState<'lunio-dark' | 'studio-dark'>(() => {
-    try {
-      const saved = localStorage.getItem('bonkey_theme')
-      if (saved === 'dark' || saved === 'studio-dark') return 'studio-dark'
-      return 'lunio-dark'
-    } catch {
-      return 'lunio-dark'
-    }
-  })
-
+  // ─── Design System Enforcement (Modern Lunio) ────────────────────────
   useEffect(() => {
-    if (theme === 'lunio-dark') {
-      document.body.classList.add('theme-lunio')
-      document.body.classList.remove('theme-studio')
-    } else {
-      document.body.classList.remove('theme-lunio')
-      document.body.classList.add('theme-studio')
-    }
+    document.body.classList.add('theme-lunio')
+    document.body.classList.remove('theme-studio')
     try {
-      localStorage.setItem('bonkey_theme', theme)
+      localStorage.removeItem('bonkey_theme')
     } catch {}
-  }, [theme])
+  }, [])
 
   // ─── State ──────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState<'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'>('home')
@@ -110,6 +97,7 @@ export default function App(): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('')
   const [activePlaylist, setActivePlaylist] = useState<string | null>(null)
   const [activeAlbum, setActiveAlbum] = useState<string | null>(null)
+  const [albumSearch, setAlbumSearch] = useState('')
   const [isScanning, setIsScanning] = useState(false)
   const [sortField, setSortField] = useState<'title' | 'artist' | 'album' | 'genre' | 'duration' | 'addedAt' | null>(null)
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc')
@@ -377,7 +365,16 @@ export default function App(): React.JSX.Element {
         }
       }
 
-      const lib = await window.api.loadLibrary()
+      let lib = await window.api.loadLibrary()
+      if ((!lib || lib.length === 0) && window.api.autoScanAudio) {
+        try {
+          const autoScanned = await window.api.autoScanAudio()
+          if (autoScanned && autoScanned.length > 0) {
+            lib = autoScanned
+          }
+        } catch {}
+      }
+
       if (lib && Array.isArray(lib)) {
         setTracks(lib as TrackMeta[])
         // Auto-recover folder from indexed tracks if settings was empty
@@ -829,6 +826,14 @@ export default function App(): React.JSX.Element {
         result = result.filter((t) => pFilePaths.includes(t.filePath))
       } else if (activeAlbum) {
         result = result.filter((t) => t.album === activeAlbum)
+        if (albumSearch.trim()) {
+          const aq = albumSearch.toLowerCase()
+          result = result.filter(
+            (t) =>
+              t.title.toLowerCase().includes(aq) ||
+              t.artist.toLowerCase().includes(aq)
+          )
+        }
       }
     }
 
@@ -911,6 +916,7 @@ export default function App(): React.JSX.Element {
 
   const handleSelectAlbumFromDashboard = (album: string) => {
     setActiveAlbum(album)
+    setAlbumSearch('')
     setCurrentView('library')
     setActivePlaylist(null)
     setSearchQuery('')
@@ -921,6 +927,7 @@ export default function App(): React.JSX.Element {
     setActivePlaylist(null)
     setActiveAlbum(null)
     setSearchQuery('')
+    setAlbumSearch('')
     if (currentView === 'latest') {
       setCurrentView('library')
     }
@@ -929,8 +936,8 @@ export default function App(): React.JSX.Element {
   return (
     <div className="app-container">
       {/* Draggable header bar */}
-      <header className="app-header">
-        <div className="app-title">Bonkey Music</div>
+      <header className="app-header" data-tauri-drag-region>
+        <div className="app-title" data-tauri-drag-region>Bonkey Music</div>
       </header>
 
       {/* Left Sidebar */}
@@ -1027,39 +1034,6 @@ export default function App(): React.JSX.Element {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             <h2 className="section-title">Settings</h2>
             
-            <div className="settings-section">
-              <div className="settings-row">
-                <div className="settings-label">
-                  <span className="settings-title">Appearance Theme</span>
-                  <span className="settings-subtitle">Choose between the modern Dark Lunio crimson design or classic studio dark mode.</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    className={`btn-secondary ${theme === 'lunio-dark' ? 'active' : ''}`}
-                    onClick={() => setTheme('lunio-dark')}
-                    style={{
-                      background: theme === 'lunio-dark' ? 'var(--accent)' : 'rgba(255, 255, 255, 0.05)',
-                      color: '#ffffff',
-                      border: theme === 'lunio-dark' ? '1px solid var(--accent)' : '1px solid rgba(255, 255, 255, 0.12)'
-                    }}
-                  >
-                    Dark Lunio (Modern)
-                  </button>
-                  <button
-                    className={`btn-secondary ${theme === 'studio-dark' ? 'active' : ''}`}
-                    onClick={() => setTheme('studio-dark')}
-                    style={{
-                      background: theme === 'studio-dark' ? '#27272a' : 'rgba(255, 255, 255, 0.05)',
-                      color: '#ffffff',
-                      border: theme === 'studio-dark' ? '1px solid #52525b' : '1px solid rgba(255, 255, 255, 0.12)'
-                    }}
-                  >
-                    Studio Dark (Classic)
-                  </button>
-                </div>
-              </div>
-            </div>
-
             <div className="settings-section">
               <div className="settings-row" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: '16px' }}>
                 <div className="settings-label">
@@ -1226,13 +1200,42 @@ export default function App(): React.JSX.Element {
         ) : (
           /* Dashboard or Track List Views */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
-            {/* Header section if active filter is set */}
-            {((activeAlbum || searchQuery) && !activePlaylist && currentView !== 'latest') && (
+            {/* Spotify/Apple Music style Album Banner (matching Foto 2) */}
+            {activeAlbum && !activePlaylist && (
+              <AlbumBanner
+                albumName={activeAlbum}
+                tracks={displayedTracks}
+                onPlayAlbum={(shuffle) => {
+                  if (displayedTracks.length > 0) {
+                    if (shuffle) {
+                      const randomIndex = Math.floor(Math.random() * displayedTracks.length)
+                      playTrack(displayedTracks[randomIndex], displayedTracks)
+                      if (!isShuffle) {
+                        toggleShuffle()
+                      }
+                    } else {
+                      playTrack(displayedTracks[0], displayedTracks)
+                    }
+                  }
+                }}
+                onAddToQueue={(albumTracks) => {
+                  albumTracks.forEach((t) => addToQueue(t))
+                }}
+                onSelectArtist={(artist) => {
+                  setSearchQuery(artist)
+                }}
+                searchQuery={albumSearch}
+                onSearchChange={setAlbumSearch}
+              />
+            )}
+
+            {/* Header section if active search filter is set (when not in album) */}
+            {searchQuery && !activeAlbum && !activePlaylist && currentView !== 'latest' && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                   <div>
                     <h2 className="section-title" style={{ marginBottom: 0 }}>
-                      {activeAlbum ? `Album: ${activeAlbum}` : 'Search Results'}
+                      Search Results
                     </h2>
                     <span style={{ fontSize: '12px', color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>
                       {displayedTracks.length} tracks found
@@ -1436,6 +1439,7 @@ export default function App(): React.JSX.Element {
                   onRemoveFromPlaylist={handleRemoveFromPlaylist}
                   currentPlaylistName={activePlaylist}
                   onReorderTracks={activePlaylist ? handleReorderPlaylistTracks : undefined}
+                  isAlbumView={Boolean(activeAlbum)}
                 />
 
                 {activePlaylist && (
@@ -1512,6 +1516,7 @@ export default function App(): React.JSX.Element {
         currentTrack={currentTrack}
         isPlaying={isPlaying}
         queue={queue}
+        onReorderQueue={reorderQueue}
       />
 
       {/* Synced Lyrics Panel */}
@@ -1583,6 +1588,19 @@ export default function App(): React.JSX.Element {
           onOpenNowPlaying={() => {
             setIsLyricsOpen(false)
             setIsNowPlayingOpen(true)
+          }}
+          currentView={currentView}
+          setCurrentView={(view) => {
+            setCurrentView(view)
+            setActiveAlbum(null)
+            setActivePlaylist(null)
+          }}
+          activePlaylist={activePlaylist}
+          activeAlbum={activeAlbum}
+          onClearActiveFilters={handleClearFilters}
+          onSearchClick={() => {
+            searchInputRef.current?.focus()
+            searchInputRef.current?.select()
           }}
         />
       )}
