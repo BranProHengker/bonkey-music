@@ -86,9 +86,11 @@ jobs:
 
       - name: Setup Android NDK
         uses: nttld/setup-ndk@v1
+        id: setup-ndk
         with:
           ndk-version: r26d
           add-to-path: true
+          link-to-sdk: true
 
       - name: Accept Android SDK Licenses
         run: |
@@ -114,9 +116,17 @@ jobs:
         run: pnpm install
 
       - name: Build Android APK
-        env:
-          NDK_HOME: ${{ env.NDK_HOME || env.ANDROID_NDK_HOME }}
         run: |
+          # Resolve NDK_HOME reliably from environment or filesystem
+          if [ -z "$NDK_HOME" ]; then
+            export NDK_HOME="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+          fi
+          if [ -z "$NDK_HOME" ] || [ ! -d "$NDK_HOME" ]; then
+            export NDK_HOME=$(find "$ANDROID_HOME/ndk" /opt/hostedtoolcache/ndk -maxdepth 2 -mindepth 1 -type d 2>/dev/null | sort -V | tail -n 1)
+          fi
+          echo "Verified NDK_HOME=$NDK_HOME"
+          export ANDROID_NDK_HOME="$NDK_HOME"
+
           pnpm tauri android init
           MANIFEST="src-tauri/gen/android/app/src/main/AndroidManifest.xml"
           if [ -f "$MANIFEST" ]; then
