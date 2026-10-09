@@ -1,6 +1,6 @@
 {
   "name": "bonkey-music",
-  "version": "2.3.4",
+  "version": "2.3.5",
   "description": "A modern Hi-Fi music player built with Tauri v2, Rust, and React",
   "author": "www.gutsi.my.id",
   "scripts": {

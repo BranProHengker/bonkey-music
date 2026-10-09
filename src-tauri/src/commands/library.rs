@@ -5,6 +5,19 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 pub fn get_app_dir() -> PathBuf {
+    #[cfg(target_os = "android")]
+    {
+        for candidate in &[
+            "/data/data/com.bonkeymusic.app/files",
+            "/data/user/0/com.bonkeymusic.app/files",
+        ] {
+            let p = PathBuf::from(candidate);
+            if p.exists() || fs::create_dir_all(&p).is_ok() {
+                return p;
+            }
+        }
+    }
+
     if let Some(config) = dirs::config_dir() {
         let dir = config.join("bonkey-music");
         if dir.exists() {
@@ -57,9 +70,31 @@ fn read_library_from_disk() -> Vec<TrackMeta> {
 }
 
 fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
+    let mut scanned_tracks: Vec<TrackMeta> = Vec::new();
+
+    // 1. Android MediaStore JSON cache check
+    let app_dir = get_app_dir();
+    let mediastore_file = app_dir.join("mediastore_tracks.json");
+    if mediastore_file.exists() {
+        if let Ok(content) = fs::read_to_string(&mediastore_file) {
+            if let Ok(tracks) = serde_json::from_str::<Vec<TrackMeta>>(&content) {
+                for track in tracks {
+                    let p = Path::new(&track.file_path);
+                    if p.exists() {
+                        if let Ok(meta) = read_track_metadata(p) {
+                            scanned_tracks.push(meta);
+                            continue;
+                        }
+                    }
+                    scanned_tracks.push(track);
+                }
+            }
+        }
+    }
+
     let mut candidate_dirs: Vec<PathBuf> = Vec::new();
 
-    // 1. Android public directories
+    // 2. Android public directories
     let android_paths = [
         "/storage/emulated/0/Music",
         "/storage/emulated/0/Download",
@@ -67,6 +102,8 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
         "/storage/emulated/0/Podcasts",
         "/storage/emulated/0/Recordings",
         "/storage/emulated/0/Documents",
+        "/storage/emulated/0/Snaptube",
+        "/storage/emulated/0/Telegram",
         "/sdcard/Music",
         "/sdcard/Download",
     ];
@@ -77,7 +114,25 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
         }
     }
 
-    // 2. Desktop standard audio directory
+    #[cfg(target_os = "android")]
+    {
+        let base_android = Path::new("/storage/emulated/0");
+        if base_android.exists() && base_android.is_dir() {
+            if let Ok(entries) = fs::read_dir(base_android) {
+                for entry in entries.filter_map(|e| e.ok()) {
+                    let p = entry.path();
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if p.is_dir() && !name.starts_with('.') && name != "Android" && name != "node_modules" {
+                        if !candidate_dirs.contains(&p) {
+                            candidate_dirs.push(p);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. Desktop standard audio directory
     if candidate_dirs.is_empty() {
         if let Some(audio_dir) = dirs::audio_dir() {
             if audio_dir.exists() {
@@ -86,7 +141,6 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
         }
     }
 
-    let mut scanned_tracks = Vec::new();
     let valid_exts = [
         "mp3", "flac", "wav", "m4a", "ogg", "aac", "wma", "alac", "aiff",
     ];
@@ -108,8 +162,11 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
                     .map(|s| s.to_lowercase())
                 {
                     if valid_exts.contains(&ext.as_str()) {
-                        if let Ok(meta) = read_track_metadata(p) {
-                            scanned_tracks.push(meta);
+                        let path_str = p.to_string_lossy().to_string();
+                        if !scanned_tracks.iter().any(|t| t.file_path == path_str) {
+                            if let Ok(meta) = read_track_metadata(p) {
+                                scanned_tracks.push(meta);
+                            }
                         }
                     }
                 }
@@ -118,7 +175,7 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
     }
 
     if scanned_tracks.is_empty() {
-        return Ok(Vec::new());
+        return Ok(read_library_from_disk());
     }
 
     let mut existing = read_library_from_disk();
@@ -136,6 +193,11 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
     }
 
     Ok(existing)
+}
+
+#[tauri::command]
+pub fn save_library(tracks: Vec<TrackMeta>) -> Result<(), String> {
+    save_library_to_disk(&tracks)
 }
 
 #[tauri::command]

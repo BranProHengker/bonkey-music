@@ -273,6 +273,7 @@ pub fn run() {
             auto_scan_audio,
             scan_folder,
             load_library,
+            save_library,
             reset_library,
             remove_library_folder,
             import_files,

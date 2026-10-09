@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   ArrowClockwise,
   Heart,
-  Folder,
   Info,
   PencilSimple,
   Trash,
@@ -81,6 +80,9 @@ export default function App(): React.JSX.Element {
       localStorage.removeItem('bonkey_theme')
     } catch {}
   }, [])
+
+  // ─── Platform Detection ─────────────────────────────────────────────
+  const isMobilePlatform = typeof window !== 'undefined' && (/android|iphone|ipad|ipod/i.test(navigator.userAgent) || !!(window as any).AndroidBridge || window.innerWidth <= 768)
 
   // ─── State ──────────────────────────────────────────────────────────
   const [currentView, setCurrentView] = useState<'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'>('home')
@@ -332,6 +334,53 @@ export default function App(): React.JSX.Element {
     await window.api.saveSettings(updatedSettings)
   }
 
+  // ─── Auto Scan Audio ────────────────────────────────────────────────
+  const handleAutoScan = async () => {
+    if (isScanning) return
+    setIsScanning(true)
+    try {
+      // 1. Android MediaStore Bridge (Direct native query on Android)
+      const bridge = (window as any).AndroidBridge
+      if (bridge && typeof bridge.scanAudio === 'function') {
+        const jsonStr = bridge.scanAudio()
+        if (jsonStr) {
+          try {
+            const parsed = JSON.parse(jsonStr)
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setTracks(parsed as TrackMeta[])
+              if (window.api.saveLibrary) {
+                await window.api.saveLibrary(parsed as TrackMeta[])
+              }
+              setIsScanning(false)
+              return
+            }
+          } catch (e) {
+            console.error('[Bonkey Music] Failed to parse MediaStore JSON:', e)
+          }
+        }
+      }
+
+      // 2. Tauri Command auto_scan_audio (Backend scan)
+      if (window.api.autoScanAudio) {
+        const scanned = await window.api.autoScanAudio()
+        if (scanned && Array.isArray(scanned) && scanned.length > 0) {
+          setTracks(scanned as TrackMeta[])
+          const settings = await window.api.loadSettings()
+          if (settings && Array.isArray(settings.libraryFolders)) {
+            setLibraryFolders(settings.libraryFolders as string[])
+          }
+          if (settings && typeof settings.libraryFolder === 'string') {
+            setLibraryFolder(settings.libraryFolder)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[Bonkey Music] Auto-scan error:', err)
+    } finally {
+      setIsScanning(false)
+    }
+  }
+
   // ─── Load Library and Settings ──────────────────────────────────────
   useEffect(() => {
     async function loadData() {
@@ -368,36 +417,27 @@ export default function App(): React.JSX.Element {
       let lib = await window.api.loadLibrary()
       if (lib && Array.isArray(lib) && lib.length > 0) {
         setTracks(lib as TrackMeta[])
-      } else if (window.api.autoScanAudio) {
-        // Run auto-scan in background without freezing UI
-        setIsScanning(true)
-        window.api.autoScanAudio().then((scanned) => {
-          if (scanned && Array.isArray(scanned) && scanned.length > 0) {
-            setTracks(scanned as TrackMeta[])
-          }
-        }).catch((err) => {
-          console.warn('Background auto-scan error:', err)
-        }).finally(() => {
-          setIsScanning(false)
-        })
+      } else {
+        // Run auto-scan in background if empty
+        handleAutoScan()
       }
 
-        // Auto-recover folder from indexed tracks if settings was empty
-        if (!currentFolder && lib && Array.isArray(lib) && lib.length > 0 && lib[0]?.filePath) {
-          const firstPath = lib[0].filePath
-          const separator = firstPath.includes('/') ? '/' : '\\'
-          const folderPart = firstPath.substring(0, firstPath.lastIndexOf(separator))
-          if (folderPart) {
-            currentFolder = folderPart
-            if (!currentFolders.includes(folderPart)) {
-              currentFolders.push(folderPart)
-            }
-            setLibraryFolder(currentFolder)
-            setLibraryFolders(currentFolders)
-            await persistSettings({ libraryFolder: currentFolder, libraryFolders: currentFolders })
+      // Auto-recover folder from indexed tracks if settings was empty
+      if (!currentFolder && lib && Array.isArray(lib) && lib.length > 0 && lib[0]?.filePath) {
+        const firstPath = lib[0].filePath
+        const separator = firstPath.includes('/') ? '/' : '\\'
+        const folderPart = firstPath.substring(0, firstPath.lastIndexOf(separator))
+        if (folderPart) {
+          currentFolder = folderPart
+          if (!currentFolders.includes(folderPart)) {
+            currentFolders.push(folderPart)
           }
+          setLibraryFolder(currentFolder)
+          setLibraryFolders(currentFolders)
+          await persistSettings({ libraryFolder: currentFolder, libraryFolders: currentFolders })
         }
       }
+    }
     loadData()
   }, [])
 
@@ -434,28 +474,6 @@ export default function App(): React.JSX.Element {
       }
     } catch (err) {
       console.error('Scan error:', err)
-    } finally {
-      setIsScanning(false)
-    }
-  }
-
-  const handleAutoScan = async () => {
-    if (isScanning || !window.api.autoScanAudio) return
-    setIsScanning(true)
-    try {
-      const scanned = await window.api.autoScanAudio()
-      if (scanned && Array.isArray(scanned) && scanned.length > 0) {
-        setTracks(scanned as TrackMeta[])
-        const settings = await window.api.loadSettings()
-        if (settings && Array.isArray(settings.libraryFolders)) {
-          setLibraryFolders(settings.libraryFolders as string[])
-        }
-        if (settings && typeof settings.libraryFolder === 'string') {
-          setLibraryFolder(settings.libraryFolder)
-        }
-      }
-    } catch (err) {
-      console.error('Auto-scan error:', err)
     } finally {
       setIsScanning(false)
     }
@@ -1199,23 +1217,92 @@ export default function App(): React.JSX.Element {
           </div>
         ) : (!libraryFolder && tracks.length === 0) ? (
           /* Empty Library / Init State */
-          <div className="empty-state">
-            <div className="empty-state-icon">
-              <Folder size={28} weight="light" />
+          <div
+            className="empty-state"
+            style={{
+              maxWidth: '440px',
+              margin: '40px auto 0',
+              textAlign: 'center',
+              padding: '36px 24px',
+              background: 'var(--bg-card, rgba(255, 255, 255, 0.03))',
+              borderRadius: '20px',
+              border: '1px solid rgba(255, 255, 255, 0.06)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
+            }}
+          >
+            <div
+              className="empty-state-icon"
+              style={{
+                width: '64px',
+                height: '64px',
+                borderRadius: '50%',
+                background: 'rgba(255, 255, 255, 0.06)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginBottom: '16px'
+              }}
+            >
+              <MusicNotes size={32} weight="duotone" />
             </div>
-            <h2>Setup Your Library</h2>
-            <p>
-              Pindai musik otomatis dari penyimpanan perangkat Anda, atau pilih folder lokal secara manual.
+            <h2 style={{ fontSize: '20px', fontWeight: 600, margin: '0 0 8px', letterSpacing: '-0.02em' }}>
+              Pustaka Musik Kosong
+            </h2>
+            <p style={{ fontSize: '13px', opacity: 0.7, margin: '0 0 24px', lineHeight: 1.5 }}>
+              {isMobilePlatform
+                ? 'Pindai otomatis semua lagu yang tersimpan di memori perangkat Anda untuk mulai mendengarkan.'
+                : 'Pindai otomatis file audio dari penyimpanan sistem Anda atau pilih folder musik secara manual.'}
             </p>
-            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', justifyContent: 'center', marginTop: '12px' }}>
-              <button className="btn-primary" onClick={handleAutoScan} disabled={isScanning}>
-                <ArrowClockwise size={18} className={isScanning ? 'animate-spin' : ''} />
-                <span>{isScanning ? 'Memindai Musik...' : 'Pindai Musik Otomatis'}</span>
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: isMobilePlatform ? 'column' : 'row',
+                gap: '12px',
+                justifyContent: 'center',
+                alignItems: 'center',
+                width: '100%'
+              }}
+            >
+              <button
+                className="btn-primary"
+                onClick={handleAutoScan}
+                disabled={isScanning}
+                style={{
+                  width: isMobilePlatform ? '100%' : 'auto',
+                  minHeight: '44px',
+                  padding: '0 24px',
+                  borderRadius: '12px',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  fontSize: '14px',
+                  fontWeight: 500
+                }}
+              >
+                <ArrowClockwise size={18} className={isScanning ? 'animate-spin' : ''} weight="bold" />
+                <span>{isScanning ? 'Sedang Memindai Audio...' : 'Pindai Musik Otomatis'}</span>
               </button>
-              <button className="btn-control" onClick={handleSelectAndAddFolder} disabled={isScanning}>
-                <FolderOpen size={18} weight="light" />
-                <span>Pilih Folder Manual</span>
-              </button>
+              {!isMobilePlatform && (
+                <button
+                  className="btn-control"
+                  onClick={handleSelectAndAddFolder}
+                  disabled={isScanning}
+                  style={{
+                    minHeight: '44px',
+                    padding: '0 20px',
+                    borderRadius: '12px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    fontSize: '13px'
+                  }}
+                >
+                  <FolderOpen size={18} weight="light" />
+                  <span>Pilih Folder Manual</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (currentView === 'home' && !activePlaylist && !activeAlbum && !searchQuery) ? (

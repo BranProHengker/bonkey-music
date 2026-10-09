@@ -83,6 +83,7 @@ export interface StudioAPI {
 
 export interface MusicAPI {
   autoScanAudio: () => Promise<TrackMeta[]>
+  saveLibrary: (tracks: TrackMeta[]) => Promise<void>
   selectFolder: () => Promise<string | null>
   scanFolder: (path: string) => Promise<TrackMeta[]>
   loadLibrary: () => Promise<TrackMeta[]>

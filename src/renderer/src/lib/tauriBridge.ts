@@ -36,6 +36,7 @@ export function setupTauriBridge() {
 
     // Library & Settings
     autoScanAudio: () => invoke('auto_scan_audio'),
+    saveLibrary: (tracks: any[]) => invoke('save_library', { tracks }),
     selectFolder: () => invoke('select_folder'),
     scanFolder: (path: string) => invoke('scan_folder', { path }),
     loadLibrary: () => invoke('load_library'),
