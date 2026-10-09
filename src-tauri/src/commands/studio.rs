@@ -33,52 +33,73 @@ pub fn studio_inspect_multiple(
 
 #[tauri::command]
 pub fn studio_select_file() -> Result<Option<String>, String> {
-    let file = rfd::FileDialog::new()
-        .add_filter(
-            "Audio Files",
-            &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
-        )
-        .pick_file();
-    Ok(file.map(|p| p.to_string_lossy().to_string()))
+    #[cfg(not(target_os = "android"))]
+    {
+        let file = rfd::FileDialog::new()
+            .add_filter(
+                "Audio Files",
+                &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
+            )
+            .pick_file();
+        Ok(file.map(|p| p.to_string_lossy().to_string()))
+    }
+    #[cfg(target_os = "android")]
+    {
+        Ok(None)
+    }
 }
 
 #[tauri::command]
 pub fn studio_select_multiple_files() -> Result<Vec<String>, String> {
-    let files = rfd::FileDialog::new()
-        .add_filter(
-            "Audio Files",
-            &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
-        )
-        .pick_files();
-    Ok(files
-        .unwrap_or_default()
-        .into_iter()
-        .map(|p| p.to_string_lossy().to_string())
-        .collect())
+    #[cfg(not(target_os = "android"))]
+    {
+        let files = rfd::FileDialog::new()
+            .add_filter(
+                "Audio Files",
+                &["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"],
+            )
+            .pick_files();
+        Ok(files
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.to_string_lossy().to_string())
+            .collect())
+    }
+    #[cfg(target_os = "android")]
+    {
+        Ok(Vec::new())
+    }
 }
 
 #[tauri::command]
 pub fn studio_select_folder_to_inspect() -> Result<Vec<String>, String> {
-    let folder = rfd::FileDialog::new().pick_folder();
-    let mut files = Vec::new();
-    if let Some(dir) = folder {
-        let valid_exts = ["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"];
-        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
-            let p = entry.path();
-            if p.is_file() {
-                if let Some(ext) = p
-                    .extension()
-                    .and_then(|s| s.to_str())
-                    .map(|s| s.to_lowercase())
-                {
-                    if valid_exts.contains(&ext.as_str()) {
-                        files.push(p.to_string_lossy().to_string());
+    #[cfg(not(target_os = "android"))]
+    {
+        let folder = rfd::FileDialog::new().pick_folder();
+        let mut files = Vec::new();
+        if let Some(dir) = folder {
+            let valid_exts = ["flac", "wav", "mp3", "m4a", "ogg", "alac", "aiff"];
+            for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+                let p = entry.path();
+                if p.is_file() {
+                    if let Some(ext) = p
+                        .extension()
+                        .and_then(|s| s.to_str())
+                        .map(|s| s.to_lowercase())
+                    {
+                        if valid_exts.contains(&ext.as_str()) {
+                            files.push(p.to_string_lossy().to_string());
+                        }
                     }
                 }
             }
         }
+        Ok(files)
     }
-    Ok(files)
+    #[cfg(target_os = "android")]
+    {
+        Ok(Vec::new())
+    }
 }
 
 fn resolve_target_music_dir(custom_dir: Option<String>) -> PathBuf {
