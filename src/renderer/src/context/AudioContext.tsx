@@ -690,6 +690,41 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [])
 
+  // Synchronize playback state to native Android Media Notification
+  useEffect(() => {
+    const bridge = (window as any).AndroidBridge
+    if (bridge && typeof bridge.updatePlayback === 'function' && currentTrack) {
+      try {
+        bridge.updatePlayback(
+          currentTrack.title || 'Unknown Title',
+          currentTrack.artist || 'Unknown Artist',
+          currentTrack.album || 'Unknown Album',
+          isPlaying,
+          Math.round((duration || 0) * 1000),
+          Math.round((audioRef.current?.currentTime || 0) * 1000)
+        )
+      } catch (_) {}
+    }
+  }, [currentTrack, isPlaying, duration])
+
+  // Native Android Media Notification action bridge
+  useEffect(() => {
+    ;(window as any).__androidMediaAction = (action: string, param?: number) => {
+      if (action === 'toggle' || action === 'play' || action === 'pause') {
+        togglePlayRef.current()
+      } else if (action === 'next') {
+        nextTrackRef.current()
+      } else if (action === 'prev') {
+        prevTrackRef.current()
+      } else if (action === 'seek' && typeof param === 'number') {
+        seekRef.current(param)
+      }
+    }
+    return () => {
+      delete (window as any).__androidMediaAction
+    }
+  }, [])
+
   // Stable refs for volume controls
   const volumeRef = useRef(volume)
   const changeVolumeRef = useRef(changeVolume)

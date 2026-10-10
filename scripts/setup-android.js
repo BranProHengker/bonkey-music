@@ -31,7 +31,7 @@ const manifestPath = path.resolve(__dirname, '../src-tauri/gen/android/app/src/m
 if (fs.existsSync(manifestPath)) {
   let content = fs.readFileSync(manifestPath, 'utf8')
   if (!content.includes('android.permission.READ_MEDIA_AUDIO')) {
-    const permissions = `    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n`
+    const permissions = `    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />\n`
     content = content.replace('<application', `${permissions}    <application`)
   }
   if (!content.includes('android:requestLegacyExternalStorage="true"')) {
@@ -87,10 +87,28 @@ import org.json.JSONObject
 
 class MainActivity : TauriActivity() {
   private var webViewRef: WebView? = null
+  private var mediaSession: android.media.session.MediaSession? = null
+  private var notificationManager: android.app.NotificationManager? = null
+  private val CHANNEL_ID = "bonkey_music_playback"
+  private val NOTIF_ID = 101
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     requestAudioPermissions()
+    setupMediaSession()
+    handleMediaActionIntent(intent)
+  }
+
+  override fun onNewIntent(intent: Intent?) {
+    super.onNewIntent(intent)
+    handleMediaActionIntent(intent)
+  }
+
+  private fun handleMediaActionIntent(intent: Intent?) {
+    val action = intent?.getStringExtra("bonkey_action") ?: return
+    webViewRef?.post {
+      webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('$action'); }", null)
+    }
   }
 
   override fun onResume() {
@@ -105,7 +123,151 @@ class MainActivity : TauriActivity() {
       fun scanAudio(): String {
         return scanAudioFull()
       }
+
+      @JavascriptInterface
+      fun updatePlayback(title: String, artist: String, album: String, isPlaying: Boolean, durationMs: Long, positionMs: Long) {
+        runOnUiThread {
+          showPlaybackNotification(title, artist, album, isPlaying, durationMs, positionMs)
+        }
+      }
     }, "AndroidBridge")
+  }
+
+  private fun setupMediaSession() {
+    try {
+      mediaSession = android.media.session.MediaSession(this, "BonkeyMusicSession").apply {
+        setCallback(object : android.media.session.MediaSession.Callback() {
+          override fun onPlay() {
+            webViewRef?.post {
+              webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('play'); }", null)
+            }
+          }
+          override fun onPause() {
+            webViewRef?.post {
+              webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('pause'); }", null)
+            }
+          }
+          override fun onSkipToNext() {
+            webViewRef?.post {
+              webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('next'); }", null)
+            }
+          }
+          override fun onSkipToPrevious() {
+            webViewRef?.post {
+              webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('prev'); }", null)
+            }
+          }
+          override fun onSeekTo(pos: Long) {
+            val sec = pos / 1000.0
+            webViewRef?.post {
+              webViewRef?.evaluateJavascript("if (window.__androidMediaAction) { window.__androidMediaAction('seek', $sec); }", null)
+            }
+          }
+        })
+        isActive = true
+      }
+
+      notificationManager = getSystemService(android.content.Context.NOTIFICATION_SERVICE) as? android.app.NotificationManager
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        val channel = android.app.NotificationChannel(
+          CHANNEL_ID,
+          "Music Playback",
+          android.app.NotificationManager.IMPORTANCE_LOW
+        ).apply {
+          description = "Now playing media notification"
+          setShowBadge(false)
+        }
+        notificationManager?.createNotificationChannel(channel)
+      }
+    } catch (e: Exception) {
+      e.printStackTrace()
+    }
+  }
+
+  private fun showPlaybackNotification(
+    title: String,
+    artist: String,
+    album: String,
+    isPlaying: Boolean,
+    durationMs: Long,
+    positionMs: Long
+  ) {
+    try {
+      val session = mediaSession ?: return
+      val state = android.media.session.PlaybackState.Builder()
+        .setActions(
+          android.media.session.PlaybackState.ACTION_PLAY or
+          android.media.session.PlaybackState.ACTION_PAUSE or
+          android.media.session.PlaybackState.ACTION_SKIP_TO_NEXT or
+          android.media.session.PlaybackState.ACTION_SKIP_TO_PREVIOUS or
+          android.media.session.PlaybackState.ACTION_SEEK_TO
+        )
+        .setState(
+          if (isPlaying) android.media.session.PlaybackState.STATE_PLAYING else android.media.session.PlaybackState.STATE_PAUSED,
+          positionMs,
+          1.0f
+        )
+        .build()
+      session.setPlaybackState(state)
+
+      val meta = android.media.MediaMetadata.Builder()
+        .putString(android.media.MediaMetadata.METADATA_KEY_TITLE, title)
+        .putString(android.media.MediaMetadata.METADATA_KEY_ARTIST, artist)
+        .putString(android.media.MediaMetadata.METADATA_KEY_ALBUM, album)
+        .putLong(android.media.MediaMetadata.METADATA_KEY_DURATION, durationMs)
+        .build()
+      session.setMetadata(meta)
+
+      val contentIntent = android.app.PendingIntent.getActivity(
+        this, 0, Intent(this, MainActivity::class.java),
+        android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+      )
+
+      val prevIntent = android.app.PendingIntent.getActivity(
+        this, 1, Intent(this, MainActivity::class.java).apply { putExtra("bonkey_action", "prev") },
+        android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+      )
+      val playIntent = android.app.PendingIntent.getActivity(
+        this, 2, Intent(this, MainActivity::class.java).apply { putExtra("bonkey_action", "toggle") },
+        android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+      )
+      val nextIntent = android.app.PendingIntent.getActivity(
+        this, 3, Intent(this, MainActivity::class.java).apply { putExtra("bonkey_action", "next") },
+        android.app.PendingIntent.FLAG_IMMUTABLE or android.app.PendingIntent.FLAG_UPDATE_CURRENT
+      )
+
+      val notifBuilder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        android.app.Notification.Builder(this, CHANNEL_ID)
+      } else {
+        @Suppress("DEPRECATION")
+        android.app.Notification.Builder(this)
+      }
+
+      notifBuilder
+        .setContentTitle(title)
+        .setContentText(artist)
+        .setSmallIcon(android.R.drawable.ic_media_play)
+        .setContentIntent(contentIntent)
+        .setStyle(
+          android.app.Notification.MediaStyle()
+            .setMediaSession(session.sessionToken)
+            .setShowActionsInCompactView(0, 1, 2)
+        )
+        .setVisibility(android.app.Notification.VISIBILITY_PUBLIC)
+        .setOngoing(isPlaying)
+
+      notifBuilder.addAction(android.R.drawable.ic_media_previous, "Previous", prevIntent)
+      if (isPlaying) {
+        notifBuilder.addAction(android.R.drawable.ic_media_pause, "Pause", playIntent)
+      } else {
+        notifBuilder.addAction(android.R.drawable.ic_media_play, "Play", playIntent)
+      }
+      notifBuilder.addAction(android.R.drawable.ic_media_next, "Next", nextIntent)
+
+      notificationManager?.notify(NOTIF_ID, notifBuilder.build())
+    } catch (e: Exception) {
+      e.printStackTrace()
+    }
   }
 
   override fun onRequestPermissionsResult(
@@ -142,9 +304,12 @@ class MainActivity : TauriActivity() {
       }
     }
 
-    // 2. Standard runtime permissions
+    // 2. Standard runtime permissions & Notification permission (Android 13+)
     val permissions = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-      arrayOf(android.Manifest.permission.READ_MEDIA_AUDIO)
+      arrayOf(
+        android.Manifest.permission.READ_MEDIA_AUDIO,
+        android.Manifest.permission.POST_NOTIFICATIONS
+      )
     } else {
       arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE)
     }

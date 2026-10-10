@@ -489,6 +489,8 @@ function PlayerBar({
       <MobileBottomDock
         currentTrack={currentTrack}
         isPlaying={isPlaying}
+        isShuffle={isShuffle}
+        onToggleShuffle={toggleShuffle}
         onPlayPause={handlePlayClick}
         onNext={nextTrack}
         onOpenNowPlaying={onOpenNowPlaying || (() => {})}

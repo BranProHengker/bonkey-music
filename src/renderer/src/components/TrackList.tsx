@@ -562,6 +562,7 @@ function TrackList({
         </div>
       </div>
 
+
       {/* Grid Mode */}
       {viewMode === 'grid' ? (
         <div className="track-grid-container">

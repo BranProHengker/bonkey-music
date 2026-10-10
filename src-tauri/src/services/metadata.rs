@@ -4,8 +4,10 @@ use lofty::file::{AudioFile, TaggedFileExt};
 use lofty::picture::{MimeType, Picture, PictureType};
 use lofty::probe::Probe;
 use lofty::tag::{Accessor, Tag, TagExt};
+use std::collections::HashMap;
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::UNIX_EPOCH;
 
 pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
@@ -147,56 +149,80 @@ pub fn embed_metadata(
     tag.save_to_path(path, WriteOptions::default())
         .map_err(|e| format!("Failed to save tag to file: {}", e))?;
 
+    if let Some(cache) = COVER_CACHE.get() {
+        if let Ok(mut guard) = cache.write() {
+            guard.remove(path);
+        }
+    }
+
     Ok(())
 }
 
-pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
-    if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
-        for t in tagged_file.tags() {
-            if let Some(pic) = t.pictures().first() {
-                let mime = match pic.mime_type() {
-                    Some(MimeType::Png) => "image/png",
-                    _ => "image/jpeg",
-                };
-                return Some((pic.data().to_vec(), mime));
-            }
-        }
-        let tag = tagged_file
-            .primary_tag()
-            .or_else(|| tagged_file.first_tag());
-        if let Some(t) = tag {
-            if let Some(pic) = t.pictures().first() {
-                let mime = match pic.mime_type() {
-                    Some(MimeType::Png) => "image/png",
-                    _ => "image/jpeg",
-                };
-                return Some((pic.data().to_vec(), mime));
-            }
+static COVER_CACHE: OnceLock<RwLock<HashMap<PathBuf, Option<(Arc<Vec<u8>>, &'static str)>>>> =
+    OnceLock::new();
+
+pub fn extract_cover_bytes(path: &Path) -> Option<(Arc<Vec<u8>>, &'static str)> {
+    let cache = COVER_CACHE.get_or_init(|| RwLock::new(HashMap::new()));
+    if let Ok(guard) = cache.read() {
+        if let Some(res) = guard.get(path) {
+            return res.clone();
         }
     }
 
-    if let Some(parent) = path.parent() {
-        for candidate in &[
-            "cover.jpg",
-            "cover.png",
-            "folder.jpg",
-            "folder.png",
-            "front.jpg",
-            "front.png",
-        ] {
-            let p = parent.join(candidate);
-            if p.is_file() {
-                if let Ok(data) = fs::read(&p) {
-                    let mime = if candidate.ends_with(".png") {
-                        "image/png"
-                    } else {
-                        "image/jpeg"
+    let result = (|| {
+        if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
+            for t in tagged_file.tags() {
+                if let Some(pic) = t.pictures().first() {
+                    let mime = match pic.mime_type() {
+                        Some(MimeType::Png) => "image/png",
+                        _ => "image/jpeg",
                     };
-                    return Some((data, mime));
+                    return Some((Arc::new(pic.data().to_vec()), mime));
+                }
+            }
+            let tag = tagged_file
+                .primary_tag()
+                .or_else(|| tagged_file.first_tag());
+            if let Some(t) = tag {
+                if let Some(pic) = t.pictures().first() {
+                    let mime = match pic.mime_type() {
+                        Some(MimeType::Png) => "image/png",
+                        _ => "image/jpeg",
+                    };
+                    return Some((Arc::new(pic.data().to_vec()), mime));
                 }
             }
         }
+
+        if let Some(parent) = path.parent() {
+            for candidate in &[
+                "cover.jpg",
+                "cover.png",
+                "folder.jpg",
+                "folder.png",
+                "front.jpg",
+                "front.png",
+            ] {
+                let p = parent.join(candidate);
+                if p.is_file() {
+                    if let Ok(data) = fs::read(&p) {
+                        let mime = if candidate.ends_with(".png") {
+                            "image/png"
+                        } else {
+                            "image/jpeg"
+                        };
+                        return Some((Arc::new(data), mime));
+                    }
+                }
+            }
+        }
+
+        None
+    })();
+
+    if let Ok(mut guard) = cache.write() {
+        guard.insert(path.to_path_buf(), result.clone());
     }
 
-    None
+    result
 }

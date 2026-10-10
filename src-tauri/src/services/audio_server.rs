@@ -94,7 +94,7 @@ pub fn start_audio_server() -> u16 {
                                 "HTTP/1.1 200 OK\r\n\
                                  Content-Type: {}\r\n\
                                  Content-Length: {}\r\n\
-                                 Cache-Control: public, max-age=86400\r\n\
+                                 Cache-Control: public, max-age=31536000, immutable\r\n\
                                  Access-Control-Allow-Origin: *\r\n\r\n",
                                 mime,
                                 bytes.len()

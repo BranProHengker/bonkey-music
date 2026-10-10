@@ -3,8 +3,9 @@ import {
   Play,
   Pause,
   SkipForward,
-  Compass,
-  Books,
+  Shuffle,
+  Wrench,
+  Disc,
   MusicNotes,
   House
 } from '@phosphor-icons/react'
@@ -13,6 +14,8 @@ import { TrackMeta } from '../hooks/useAudioEngine'
 interface MobileBottomDockProps {
   currentTrack: TrackMeta | null
   isPlaying: boolean
+  isShuffle?: boolean
+  onToggleShuffle?: () => void
   onPlayPause: () => void
   onNext: () => void
   onOpenNowPlaying: () => void
@@ -26,6 +29,8 @@ interface MobileBottomDockProps {
 function MobileBottomDock({
   currentTrack,
   isPlaying,
+  isShuffle = false,
+  onToggleShuffle,
   onPlayPause,
   onNext,
   onOpenNowPlaying,
@@ -36,8 +41,8 @@ function MobileBottomDock({
   onClearActiveFilters
 }: MobileBottomDockProps) {
   const isHomeActive = currentView === 'home' && !activePlaylist && !activeAlbum
-  const isExploreActive = currentView === 'studio' || currentView === 'latest'
   const isLibraryActive = currentView === 'library' || Boolean(activePlaylist) || Boolean(activeAlbum)
+  const isToolsActive = currentView === 'studio' || currentView === 'latest'
 
   const handleNavClick = (view: 'home' | 'library' | 'studio') => {
     setCurrentView(view)
@@ -48,7 +53,7 @@ function MobileBottomDock({
 
   return (
     <div className="mobile-bottom-dock">
-      {/* 1. Upper Pill: Mini Player Capsule (matching Foto 4) */}
+      {/* 1. Upper Pill: Mini Player Capsule */}
       <div
         className={`mobile-mini-player ${currentTrack ? 'has-track' : 'no-track'}`}
         onClick={currentTrack ? onOpenNowPlaying : undefined}
@@ -90,8 +95,19 @@ function MobileBottomDock({
           </div>
         </div>
 
-        {/* Action icons on the right matching Foto 4: Play/Pause and Next */}
+        {/* Action icons on the right: Shuffle, Play/Pause, Next */}
         <div className="mobile-mini-player-actions" onClick={(e) => e.stopPropagation()}>
+          <button
+            type="button"
+            className="mobile-mini-action-btn"
+            onClick={onToggleShuffle}
+            title={isShuffle ? 'Shuffle On' : 'Shuffle Off'}
+            aria-label="Toggle Shuffle"
+            style={{ color: isShuffle ? '#f43f5e' : '#ffffff' }}
+          >
+            <Shuffle size={18} weight={isShuffle ? 'bold' : 'regular'} />
+          </button>
+
           <button
             type="button"
             className="mobile-mini-action-btn"
@@ -120,7 +136,7 @@ function MobileBottomDock({
         </div>
       </div>
 
-      {/* 2. Lower Pill: Navigation Bar Capsule (matching Foto 4) */}
+      {/* 2. Lower Pill: Navigation Bar Capsule with Home, Library, Tools */}
       <nav className="mobile-bottom-nav">
         <button
           type="button"
@@ -134,22 +150,22 @@ function MobileBottomDock({
 
         <button
           type="button"
-          className={`mobile-nav-tab ${isExploreActive ? 'active' : ''}`}
-          onClick={() => handleNavClick('studio')}
-          title="Explore Studio"
-        >
-          <Compass size={17} weight={isExploreActive ? 'fill' : 'bold'} />
-          <span>Explore</span>
-        </button>
-
-        <button
-          type="button"
           className={`mobile-nav-tab ${isLibraryActive ? 'active' : ''}`}
           onClick={() => handleNavClick('library')}
           title="Library"
         >
-          <Books size={17} weight={isLibraryActive ? 'fill' : 'bold'} />
+          <Disc size={17} weight={isLibraryActive ? 'fill' : 'bold'} />
           <span>Library</span>
+        </button>
+
+        <button
+          type="button"
+          className={`mobile-nav-tab ${isToolsActive ? 'active' : ''}`}
+          onClick={() => handleNavClick('studio')}
+          title="Tools"
+        >
+          <Wrench size={17} weight={isToolsActive ? 'fill' : 'bold'} />
+          <span>Tools</span>
         </button>
       </nav>
     </div>

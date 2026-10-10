@@ -904,7 +904,7 @@ button {
   border: 1px solid rgba(255, 255, 255, 0.04);
   border-radius: var(--radius-card-outer);
   cursor: pointer;
-  transition: all var(--duration-fast) var(--ease-out-expo);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -912,7 +912,7 @@ button {
   background-color: var(--bg-elevated);
   border-color: rgba(255, 255, 255, 0.09);
   transform: translateY(-2px);
-  box-shadow: var(--shadow-card);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
 .album-artwork-wrap {
@@ -932,11 +932,11 @@ button {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform var(--duration-normal) var(--ease-out-expo);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .album-card:hover .album-artwork {
-  transform: scale(1.03);
+  transform: scale(1.02);
 }
 
 .album-artwork-placeholder {
@@ -1170,6 +1170,8 @@ button {
   font-size: 11.5px;
   letter-spacing: 0.01em;
 }
+
+
 
 /* ─── Track List Table Layout (Detailed & Compact) ─────────────────── */
 .track-list-header {
@@ -5876,9 +5878,11 @@ body.theme-lunio .sidebar-footer {
 
 /* Lunio Main Content Surface */
 body.theme-lunio .main-content {
-  background: transparent;
+  background: var(--bg-primary);
   padding: 0 0 110px 0;
   overflow-y: auto;
+  contain: paint;
+  transform: translateZ(0);
 }
 
 /* Lunio Dashboard Layout */
@@ -5990,17 +5994,15 @@ body.theme-lunio .main-content {
   gap: 14px;
   padding: 18px 20px;
   border-radius: 20px;
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  background: #17181c;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
   border: 1px solid rgba(255, 255, 255, 0.06);
   transition: transform var(--duration-fast) var(--ease-out-expo), background var(--duration-fast), border-color var(--duration-fast);
 }
 
 .stats-kpi-card:hover {
   transform: translateY(-2px);
-  background: rgba(255, 255, 255, 0.065);
+  background: #1c1d22;
   border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -6087,15 +6089,13 @@ body.theme-lunio .main-content {
 
 .stats-chart-card,
 .stats-top-songs-card {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(28px);
-  -webkit-backdrop-filter: blur(28px);
+  background: #17181c;
   border-radius: 24px;
   padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.28);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
@@ -6359,11 +6359,11 @@ body.theme-lunio .main-content {
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  transition: transform var(--duration-fast) var(--ease-out-expo);
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .album-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-2px);
 }
 
 .album-card-thumb {
@@ -6372,18 +6372,18 @@ body.theme-lunio .main-content {
   border-radius: 18px;
   overflow: hidden;
   background: #181b26;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .album-card-thumb img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.4s var(--ease-out-expo);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .album-card:hover .album-card-thumb img {
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .album-card-placeholder {
@@ -6586,7 +6586,7 @@ body.theme-lunio .main-content {
 }
 
 
-/* Floating Capsule Player Bar (Pure Borderless Liquid Glass) */
+/* Floating Capsule Player Bar (Pure Liquid Glass matching Mobile) */
 body.theme-lunio .player-bar {
   position: fixed !important;
   bottom: 20px !important;
@@ -6594,33 +6594,34 @@ body.theme-lunio .player-bar {
   right: 20px !important;
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.12) 0%,
-    rgba(255, 255, 255, 0.03) 100%
-  ), rgba(26, 26, 26, 0.40) !important;
-  backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
-  -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
+    rgba(255, 255, 255, 0.08) 0%,
+    rgba(255, 255, 255, 0.02) 100%
+  ), rgba(18, 18, 22, 0.90) !important;
+  backdrop-filter: blur(16px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
   border-radius: 9999px !important;
-  border: none !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
   outline: none !important;
-  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.42) !important;
+  box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65) !important;
   padding: 10px 24px !important;
   height: 68px !important;
   z-index: 999 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: space-between !important;
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: transform !important;
+  transform: translateZ(0) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
 }
 
 body.theme-lunio .player-bar:hover {
   background: linear-gradient(
     135deg,
-    rgba(255, 255, 255, 0.16) 0%,
-    rgba(255, 255, 255, 0.05) 100%
-  ), rgba(26, 26, 26, 0.48) !important;
-  border: none !important;
-  outline: none !important;
-  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.5) !important;
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.03) 100%
+  ), rgba(22, 22, 26, 0.94) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.70) !important;
 }
 
 body.theme-lunio .sidebar {
@@ -7066,26 +7067,31 @@ body.theme-lunio .player-bar .btn-control.active {
     display: none !important;
   }
 
-  /* Reset container to single column full-width with safe-area padding */
+  /* Reset container to single column full-width full-height with zero bottom cutoff */
   body.theme-lunio .app-container,
   .app-container {
     grid-template-columns: 1fr !important;
     grid-template-rows: 1fr !important;
     grid-template-areas:
       "main" !important;
-    padding: max(12px, env(safe-area-inset-top, 0px)) 12px calc(140px + env(safe-area-inset-bottom, 0px)) 12px !important;
+    height: 100vh !important;
+    padding: max(12px, env(safe-area-inset-top, 0px)) 12px 0 12px !important;
     gap: 0 !important;
+    overflow: hidden !important;
   }
 
   .app-header {
     display: none !important;
   }
 
-
+  body.theme-lunio .main-content,
   .main-content {
+    height: 100% !important;
+    min-height: 100% !important;
     padding-bottom: calc(140px + env(safe-area-inset-bottom, 0px)) !important; /* Space for the floating double capsules */
     margin-left: 0 !important;
     width: 100% !important;
+    overflow-y: auto !important;
   }
 
   .mobile-bottom-dock {
@@ -7103,7 +7109,7 @@ body.theme-lunio .player-bar .btn-control.active {
     pointer-events: none !important; /* Allow clicks through gaps */
   }
 
-  /* 1. Upper Capsule: Mini-Player (Pure Liquid Glass matching Desktop) */
+  /* 1. Upper Capsule: Mini-Player (Liquid Glass identical to Desktop Player Bar) */
   .mobile-mini-player {
     pointer-events: auto !important;
     width: 100% !important;
@@ -7111,14 +7117,15 @@ body.theme-lunio .player-bar .btn-control.active {
     height: 52px !important;
     background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.03) 100%
-    ), rgba(22, 22, 26, 0.52) !important;
-    backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
+      rgba(255, 255, 255, 0.08) 0%,
+      rgba(255, 255, 255, 0.02) 100%
+    ), rgba(18, 18, 22, 0.90) !important;
+    backdrop-filter: blur(16px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(16px) saturate(180%) !important;
     border-radius: 9999px !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    border: 1px solid rgba(255, 255, 255, 0.04) !important;
+    outline: none !important;
+    box-shadow: 0 16px 45px rgba(0, 0, 0, 0.65) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
@@ -7131,9 +7138,11 @@ body.theme-lunio .player-bar .btn-control.active {
   .mobile-mini-player:hover {
     background: linear-gradient(
       135deg,
-      rgba(255, 255, 255, 0.16) 0%,
-      rgba(255, 255, 255, 0.05) 100%
-    ), rgba(22, 22, 26, 0.60) !important;
+      rgba(255, 255, 255, 0.10) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    ), rgba(22, 22, 26, 0.94) !important;
+    border: 1px solid rgba(255, 255, 255, 0.07) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.70) !important;
   }
 
   .mobile-mini-player:active {
@@ -7224,54 +7233,66 @@ body.theme-lunio .player-bar .btn-control.active {
     transform: scale(0.92) !important;
   }
 
-  /* 2. Lower Capsule: Navigation Bar (Pure Liquid Glass matching Desktop) */
+  /* 2. Floating Navigation Bar (Pure Transparent Floating without Capsule Box) */
   .mobile-bottom-nav {
     pointer-events: auto !important;
     width: 100% !important;
     max-width: 440px !important;
-    height: 50px !important;
-    background: linear-gradient(
-      135deg,
-      rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.03) 100%
-    ), rgba(22, 22, 26, 0.52) !important;
-    backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
-    border-radius: 9999px !important;
-    border: 1px solid rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
+    height: 44px !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: none !important;
+    box-shadow: none !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-around !important;
-    padding: 4px 8px !important;
+    padding: 0 8px !important;
     box-sizing: border-box !important;
   }
 
   .mobile-nav-tab {
+    position: relative !important;
     background: transparent !important;
     border: none !important;
-    color: rgba(255, 255, 255, 0.6) !important;
+    color: rgba(255, 255, 255, 0.40) !important;
     font-size: 12px !important;
-    font-weight: 600 !important;
+    font-weight: 500 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 7px !important;
-    padding: 8px 20px !important;
+    gap: 6px !important;
+    padding: 8px 16px !important;
     border-radius: 9999px !important;
     cursor: pointer !important;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
   }
 
   .mobile-nav-tab:hover {
-    color: #ffffff !important;
+    color: rgba(255, 255, 255, 0.8) !important;
   }
 
   .mobile-nav-tab.active {
-    background: rgba(255, 255, 255, 0.18) !important;
+    background: transparent !important;
     color: #ffffff !important;
-    font-weight: 700 !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
+    font-weight: 600 !important;
+    box-shadow: none !important;
+  }
+
+  .mobile-nav-tab.active svg {
+    color: #f43f5e !important;
+  }
+
+  .mobile-nav-tab.active::after {
+    content: '' !important;
+    position: absolute !important;
+    bottom: 4px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: 14px !important;
+    height: 2px !important;
+    background: #f43f5e !important;
+    border-radius: 9999px !important;
   }
 
   /* Album banner responsive adjustments */
@@ -7301,10 +7322,15 @@ body.theme-lunio .player-bar .btn-control.active {
 }
 
 /* ─── Virtual Layout & Offscreen Render Optimization ─────────────────── */
-.track-row,
-.track-grid-card,
-.album-card,
-.playlist-card {
+.track-row {
   content-visibility: auto;
   contain-intrinsic-size: 0 48px;
+}
+
+/* Virtual layout optimization for smooth 60fps scrolling on wide-screen album grids */
+.album-card,
+.playlist-card,
+.track-grid-card {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 240px;
 }
