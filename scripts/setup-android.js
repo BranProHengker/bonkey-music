@@ -22,18 +22,11 @@ if (fs.existsSync(manifestPath)) {
     const permissions = `    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n`
     content = content.replace('<application', `${permissions}    <application`)
   }
-  let appAttrs = ''
   if (!content.includes('android:requestLegacyExternalStorage="true"')) {
-    appAttrs += ' android:requestLegacyExternalStorage="true"'
-  }
-  if (!content.includes('android:usesCleartextTraffic="true"')) {
-    appAttrs += ' android:usesCleartextTraffic="true"'
-  }
-  if (appAttrs) {
-    content = content.replace('<application', `<application${appAttrs}`)
+    content = content.replace('<application', '<application android:requestLegacyExternalStorage="true"')
   }
   fs.writeFileSync(manifestPath, content, 'utf8')
-  console.log('[setup-android] Successfully injected permissions and attributes into AndroidManifest.xml')
+  console.log('[setup-android] Successfully injected permissions into AndroidManifest.xml')
 } else {
   console.warn('[setup-android] AndroidManifest.xml not found at:', manifestPath)
 }
