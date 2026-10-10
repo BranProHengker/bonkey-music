@@ -3,6 +3,18 @@ const path = require('path')
 
 console.log('[setup-android] Starting Android project configuration...')
 
+// 0. Set persistent fixed debug keystore so APK updates never conflict
+const keystoreSrc = path.resolve(__dirname, 'bonkey-music.keystore')
+const homeDir = process.env.HOME || process.env.USERPROFILE
+if (fs.existsSync(keystoreSrc) && homeDir) {
+  const androidDir = path.join(homeDir, '.android')
+  if (!fs.existsSync(androidDir)) {
+    fs.mkdirSync(androidDir, { recursive: true })
+  }
+  fs.copyFileSync(keystoreSrc, path.join(androidDir, 'debug.keystore'))
+  console.log('[setup-android] Successfully set persistent debug keystore from scripts/bonkey-music.keystore')
+}
+
 // 1. Copy custom icons to Android res directory
 const iconSrcDir = path.resolve(__dirname, '../src-tauri/icons/android')
 const iconDestDir = path.resolve(__dirname, '../src-tauri/gen/android/app/src/main/res')

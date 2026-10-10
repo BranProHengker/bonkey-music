@@ -59,12 +59,13 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: 'Bonkey Music ${{ github.ref_name }}'
           releaseBody: |
-            ## What's Changed in ${{ github.ref_name }}
-            - **Zero Electron (100% Pure Tauri v2 + Rust)**: Completely removed Electron and classic UI, 0 Electron residue, pruned 285 unused dependencies.
-            - **Auto-Scan Audio System**: Automatic music detection targeting Android storage and desktop audio directories with no manual folder selection needed.
-            - **Mobile-Responsive Ergonomics**: 2-tier floating pill dock, adaptive Now Playing sheet with swipe gesture, artist subtitles on mobile track rows, and Android safe-area insets.
-            - **Discord RPC & Metadata Upgrades**: High-res remote cover art detection and embedded lyrics extraction.
-            - **Android APK Build Pipeline**: Cloud CI/CD build producing Android APK binaries.
+            ## Perubahan di ${{ github.ref_name }}
+
+            - **Fix AppImage Blank di Linux (CachyOS / Wayland)**: Mengatasi masalah layar abu-abu pada AppImage di sesi Wayland/XWayland dengan mengatur fallback DMA-BUF renderer WebKitGTK.
+            - **Fix Update APK Android Bentrok**: Menggunakan keystore rilis permanen agar update APK baru bisa langsung menimpa versi lama tanpa perlu uninstall atau kehilangan data.
+            - **Android Media Notification & Lockscreen**: Kontrol notifikasi sekarang menampilkan seekbar aktif, navigasi lagu, dan gambar cover album.
+            - **Buka Ulang App Instan (0ms Warm Start)**: Daftar lagu langsung muncul saat aplikasi dibuka kembali tanpa jeda atau layar kosong.
+            - **Pembersihan Tampilan Mobile**: Merapikan daftar lagu, menyelaraskan style dock liquid glass, dan menghapus tombol navigasi redundant.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
@@ -126,6 +127,9 @@ jobs:
           fi
           echo "Verified NDK_HOME=$NDK_HOME"
           export ANDROID_NDK_HOME="$NDK_HOME"
+
+          mkdir -p ~/.android
+          cp scripts/bonkey-music.keystore ~/.android/debug.keystore
 
           pnpm tauri android init
           node scripts/setup-android.js
