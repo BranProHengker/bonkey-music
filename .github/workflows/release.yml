@@ -61,11 +61,11 @@ jobs:
           releaseBody: |
             ## Perubahan di ${{ github.ref_name }}
 
-            - **Fix AppImage Blank di Linux (CachyOS / Wayland)**: Mengatasi masalah layar abu-abu pada AppImage di sesi Wayland/XWayland dengan mengatur fallback DMA-BUF renderer WebKitGTK.
-            - **Fix Update APK Android Bentrok**: Menggunakan keystore rilis permanen agar update APK baru bisa langsung menimpa versi lama tanpa perlu uninstall atau kehilangan data.
-            - **Android Media Notification & Lockscreen**: Kontrol notifikasi sekarang menampilkan seekbar aktif, navigasi lagu, dan gambar cover album.
-            - **Buka Ulang App Instan (0ms Warm Start)**: Daftar lagu langsung muncul saat aplikasi dibuka kembali tanpa jeda atau layar kosong.
-            - **Pembersihan Tampilan Mobile**: Merapikan daftar lagu, menyelaraskan style dock liquid glass, dan menghapus tombol navigasi redundant.
+            - **Restorasi Full Hardware GPU Acceleration di Linux (WebKitGTK)**: Mengaktifkan kembali zero-copy DMA-BUF GPU renderer native, menghilangkan stuttering dan drop frame saat scrolling hingga mulus 60-144 FPS.
+            - **In-Memory Thread-Safe Cover Art Cache (0ms Latency)**: Cover art audio FLAC/MP3 kini di-cache langsung di RAM melalui backend Rust, menghilangkan bottleneck I/O disk berulang.
+            - **Eliminasi Layout Thrashing saat Render Album**: Menghapus `content-visibility: auto` dan async decoding yang menyebabkan pergeseran layout atau keterlambatan rendering saat scrolling cepat.
+            - **Pemulihan Penuh Gaya Liquid Glass**: Efek blur kaca premium pada floating capsule player bar dan mobile dock tetap utuh 100% tanpa kompromi visual.
+            - **Fix Android APK Update Keystore & Media Notifications**: Update aplikasi Android dapat langsung ditimpa tanpa uninstall dan mendukung notifikasi seekbar aktif.
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}

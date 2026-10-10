@@ -47,10 +47,6 @@ pub fn resolve_media_path(uri_str: &str) -> PathBuf {
 pub fn run() {
     #[cfg(target_os = "linux")]
     {
-        // Fix for WebKitGTK solid gray blank window on Linux (CachyOS/Arch, Wayland, XWayland, NVIDIA/Mesa)
-        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
         // If Wayland session is active and GDK_BACKEND was forced to x11 (by AppImage AppRun),
         // restore native Wayland with x11 fallback
         if std::env::var("WAYLAND_DISPLAY").is_ok() {

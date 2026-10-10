@@ -147,8 +147,6 @@ const TrackRow = memo(function TrackRow({
               <img
                 src={track.coverArt}
                 alt="Cover Art"
-                loading="lazy"
-                decoding="async"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                   const fb = e.currentTarget.nextElementSibling as HTMLElement
@@ -182,8 +180,6 @@ const TrackRow = memo(function TrackRow({
               <img
                 src={track.coverArt}
                 alt="Cover Art"
-                loading="lazy"
-                decoding="async"
                 onError={(e) => {
                   e.currentTarget.style.display = 'none'
                   const fb = e.currentTarget.nextElementSibling as HTMLElement
@@ -301,8 +297,6 @@ const TrackGridCard = memo(function TrackGridCard({
           <img
             src={track.coverArt}
             alt={track.title}
-            loading="lazy"
-            decoding="async"
             onError={(e) => {
               e.currentTarget.style.display = 'none'
               const fb = e.currentTarget.nextElementSibling as HTMLElement
@@ -507,6 +501,7 @@ function TrackList({
   }, [visibleCount, tracks.length])
 
   const renderedTracks = useMemo(() => {
+    if (tracks.length <= 500) return tracks
     return tracks.slice(0, visibleCount)
   }, [tracks, visibleCount])
 
@@ -639,7 +634,7 @@ function TrackList({
       )}
 
       {/* Sentinel for progressive infinite rendering */}
-      {visibleCount < tracks.length && (
+      {tracks.length > 500 && visibleCount < tracks.length && (
         <div ref={sentinelRef} style={{ width: '100%', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span style={{ fontSize: '11px', color: 'rgba(255, 255, 255, 0.4)' }}>Memuat lagu lainnya...</span>
         </div>

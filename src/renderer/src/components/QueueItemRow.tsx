@@ -66,7 +66,7 @@ function QueueItemRow({
       {/* 2. Cover Art Thumbnail */}
       <div className="queue-row-thumb">
         {track.coverArt ? (
-          <img src={track.coverArt} alt={track.title} loading="lazy" />
+          <img src={track.coverArt} alt={track.title} />
         ) : (
           <MusicNotes size={16} weight="light" />
         )}

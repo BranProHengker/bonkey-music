@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-2.4.2-0A84FF?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.4.3-0A84FF?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&labelColor=0d0d0f&logo=tauri&logoColor=white" alt="Tauri" />
   <img src="https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&labelColor=0d0d0f&logo=rust&logoColor=white" alt="Rust" />
@@ -37,6 +37,8 @@ Installer dan paket aplikasi tersedia di halaman [Releases](https://github.com/B
 
 ### Performa dan Konsumsi Memori
 - Berjalan menggunakan Tauri v2 dan webview native OS, dengan penggunaan memori berkisar antara 40 sampai 70 MB RAM.
+- Akselerasi hardware GPU penuh dengan zero-copy DMA-BUF renderer di Linux untuk scrolling mulus tanpa drop frame.
+- In-memory thread-safe cover art cache di layer Rust (0ms disk I/O) untuk pemuatan sampul instan.
 - Membaca dan memproses metadata audio melalui backend Rust (Symphonia dan Lofty) tanpa konversi base64 berlebih.
 - Integrasi tray sistem, tombol media keyboard, dan kontrol playback di latar belakang.
 

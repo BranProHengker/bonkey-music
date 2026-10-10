@@ -240,8 +240,6 @@ function PlayerBar({
             <img
               src={currentTrack.coverArt}
               alt="Cover Art"
-              loading="lazy"
-              decoding="async"
               onError={(e) => {
                 e.currentTarget.style.display = 'none'
                 const fb = e.currentTarget.nextElementSibling as HTMLElement

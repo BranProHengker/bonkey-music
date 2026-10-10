@@ -1213,8 +1213,6 @@ button {
   border-radius: 8px;
   font-size: 13px;
   transition: background-color var(--duration-fast) var(--ease-out-expo), border-color var(--duration-fast) var(--ease-out-expo);
-  content-visibility: auto;
-  contain-intrinsic-size: 0 46px;
   cursor: pointer;
   border: 1px solid transparent;
 }
@@ -5881,7 +5879,6 @@ body.theme-lunio .main-content {
   background: var(--bg-primary);
   padding: 0 0 110px 0;
   overflow-y: auto;
-  contain: paint;
   transform: translateZ(0);
 }
 
@@ -6414,11 +6411,13 @@ body.theme-lunio .main-content {
   transform: translateY(6px);
   transition: all var(--duration-fast) var(--ease-out-expo);
   cursor: pointer;
+  pointer-events: none;
 }
 
 .album-card:hover .album-card-play-overlay {
   opacity: 1;
   transform: translateY(0);
+  pointer-events: auto;
 }
 
 .album-card-info {
@@ -7321,16 +7320,3 @@ body.theme-lunio .player-bar .btn-control.active {
   }
 }
 
-/* ─── Virtual Layout & Offscreen Render Optimization ─────────────────── */
-.track-row {
-  content-visibility: auto;
-  contain-intrinsic-size: 0 48px;
-}
-
-/* Virtual layout optimization for smooth 60fps scrolling on wide-screen album grids */
-.album-card,
-.playlist-card,
-.track-grid-card {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 240px;
-}

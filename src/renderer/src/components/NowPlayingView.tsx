@@ -608,7 +608,7 @@ function NowPlayingView({
           <div className="now-playing-responsive-mini-card">
             <div className="mini-card-thumb">
               {coverArtSrc ? (
-                <img src={coverArtSrc} alt={currentTrack.title} loading="lazy" decoding="async" />
+                <img src={coverArtSrc} alt={currentTrack.title} />
               ) : (
                 <MusicNotes size={18} weight="light" />
               )}
@@ -630,7 +630,7 @@ function NowPlayingView({
           <div className="now-playing-art-col">
             <div className="now-playing-art-wrapper">
               {coverArtSrc ? (
-                <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-main-art" draggable={false} loading="lazy" decoding="async" />
+                <img src={coverArtSrc} alt={currentTrack?.title} className="now-playing-main-art" draggable={false} />
               ) : (
                 <div className="now-playing-art-placeholder">
                   <MusicNotes size={90} weight="thin" />
@@ -655,7 +655,7 @@ function NowPlayingView({
                     <div className="now-playing-queue-card active-card">
                       <div className="queue-card-thumb">
                         {coverArtSrc ? (
-                          <img src={coverArtSrc} alt={currentTrack.title} loading="lazy" decoding="async" />
+                          <img src={coverArtSrc} alt={currentTrack.title} />
                         ) : (
                           <MusicNotes size={18} weight="light" />
                         )}
