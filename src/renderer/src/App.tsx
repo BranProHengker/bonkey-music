@@ -91,7 +91,16 @@ export default function App(): React.JSX.Element {
   const [isNowPlayingOpen, setIsNowPlayingOpen] = useState(false)
   const [libraryFolder, setLibraryFolder] = useState<string | null>(null)
   const [libraryFolders, setLibraryFolders] = useState<string[]>([])
-  const [tracks, setTracks] = useState<TrackMeta[]>([])
+  const [tracks, setTracks] = useState<TrackMeta[]>(() => {
+    try {
+      const cached = localStorage.getItem('bonkey_cached_tracks')
+      if (cached) {
+        const parsed = JSON.parse(cached)
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      }
+    } catch (_) {}
+    return []
+  })
   const [favorites, setFavorites] = useState<string[]>([])
   const [playlists, setPlaylists] = useState<string[]>([])
   const [playlistTracks, setPlaylistTracks] = useState<Record<string, string[]>>({})
@@ -376,6 +385,9 @@ function isJunkTrack(track: TrackMeta): boolean {
                   coverArt: (port && port > 0) ? `http://127.0.0.1:${port}/cover?path=${encodeURIComponent(t.filePath)}` : t.coverArt
                 }))
                 setTracks(cleanWithCovers)
+                try {
+                  localStorage.setItem('bonkey_cached_tracks', JSON.stringify(cleanWithCovers))
+                } catch (_) {}
                 if (window.api.saveLibrary) {
                   await window.api.saveLibrary(cleanWithCovers)
                 }
@@ -395,6 +407,9 @@ function isJunkTrack(track: TrackMeta): boolean {
         if (scanned && Array.isArray(scanned) && scanned.length > 0) {
           const clean = (scanned as TrackMeta[]).filter(t => !isJunkTrack(t))
           setTracks(clean)
+          try {
+            localStorage.setItem('bonkey_cached_tracks', JSON.stringify(clean))
+          } catch (_) {}
           const settings = await window.api.loadSettings()
           if (settings && Array.isArray(settings.libraryFolders)) {
             setLibraryFolders(settings.libraryFolders as string[])
@@ -414,7 +429,10 @@ function isJunkTrack(track: TrackMeta): boolean {
   // ─── Android Resume Bridge Callback ─────────────────────────────────
   useEffect(() => {
     ;(window as any).__refreshAndroidLibrary = () => {
-      handleAutoScan()
+      const cached = localStorage.getItem('bonkey_cached_tracks')
+      if (!cached || cached === '[]') {
+        handleAutoScan()
+      }
     }
     return () => {
       delete (window as any).__refreshAndroidLibrary
@@ -469,15 +487,19 @@ function isJunkTrack(track: TrackMeta): boolean {
             coverArt: (port && port > 0) ? `http://127.0.0.1:${port}/cover?path=${encodeURIComponent(t.filePath)}` : t.coverArt
           }))
           setTracks(cleanWithCovers)
+          try {
+            localStorage.setItem('bonkey_cached_tracks', JSON.stringify(cleanWithCovers))
+          } catch (_) {}
           if (clean.length !== lib.length && window.api.saveLibrary) {
             await window.api.saveLibrary(cleanWithCovers)
           }
-        } else {
-          handleAutoScan()
         }
       } else {
-        // Run auto-scan in background if empty
-        handleAutoScan()
+        // Run auto-scan only if completely empty on first launch
+        const cached = localStorage.getItem('bonkey_cached_tracks')
+        if (!cached || cached === '[]') {
+          handleAutoScan()
+        }
       }
 
       // Auto-recover folder from indexed tracks if settings was empty

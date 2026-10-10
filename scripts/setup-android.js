@@ -22,14 +22,18 @@ if (fs.existsSync(manifestPath)) {
     const permissions = `    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />\n`
     content = content.replace('<application', `${permissions}    <application`)
   }
+  let appAttrs = ''
   if (!content.includes('android:requestLegacyExternalStorage="true"')) {
-    content = content.replace('<application', '<application android:requestLegacyExternalStorage="true"')
+    appAttrs += ' android:requestLegacyExternalStorage="true"'
   }
   if (!content.includes('android:usesCleartextTraffic="true"')) {
-    content = content.replace('<application', '<application android:usesCleartextTraffic="true"')
+    appAttrs += ' android:usesCleartextTraffic="true"'
+  }
+  if (appAttrs) {
+    content = content.replace('<application', `<application${appAttrs}`)
   }
   fs.writeFileSync(manifestPath, content, 'utf8')
-  console.log('[setup-android] Successfully injected permissions and cleartextTraffic into AndroidManifest.xml')
+  console.log('[setup-android] Successfully injected permissions and attributes into AndroidManifest.xml')
 } else {
   console.warn('[setup-android] AndroidManifest.xml not found at:', manifestPath)
 }
@@ -86,12 +90,6 @@ class MainActivity : TauriActivity() {
 
   override fun onResume() {
     super.onResume()
-    Thread {
-      scanAudioFull()
-      webViewRef?.post {
-        webViewRef?.evaluateJavascript("if (window.__refreshAndroidLibrary) { window.__refreshAndroidLibrary(); }", null)
-      }
-    }.start()
   }
 
   override fun onWebViewCreate(webView: WebView) {

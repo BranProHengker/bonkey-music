@@ -601,12 +601,16 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
   const prevTrackRef = useRef(prevTrack)
   const nextTrackRef = useRef(nextTrack)
   const toggleShuffleRef = useRef(toggleShuffle)
+  const seekRef = useRef(seek)
+  const seekOffsetRef = useRef(seekOffset)
 
   useEffect(() => {
     togglePlayRef.current = togglePlay
     prevTrackRef.current = prevTrack
     nextTrackRef.current = nextTrack
     toggleShuffleRef.current = toggleShuffle
+    seekRef.current = seek
+    seekOffsetRef.current = seekOffset
   })
 
   // Update MediaSession Metadata when track changes
@@ -618,7 +622,12 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
           artist: currentTrack.artist,
           album: currentTrack.album,
           artwork: currentTrack.coverArt
-            ? [{ src: currentTrack.coverArt, sizes: '512x512', type: 'image/png' }]
+            ? [
+                { src: currentTrack.coverArt, sizes: '96x96' },
+                { src: currentTrack.coverArt, sizes: '128x128' },
+                { src: currentTrack.coverArt, sizes: '256x256' },
+                { src: currentTrack.coverArt, sizes: '512x512' }
+              ]
             : []
         })
       } else {
@@ -634,6 +643,21 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
     }
   }, [isPlaying])
 
+  // Sync MediaSession position state for system seekbar & lockscreen timeline
+  useEffect(() => {
+    if ('mediaSession' in navigator && 'setPositionState' in navigator.mediaSession) {
+      if (duration > 0 && !isNaN(duration) && isFinite(duration)) {
+        try {
+          navigator.mediaSession.setPositionState({
+            duration: Math.max(0, duration),
+            playbackRate: 1,
+            position: Math.min(Math.max(0, currentTime), duration)
+          })
+        } catch (_) {}
+      }
+    }
+  }, [currentTime, duration])
+
   // Bind MediaSession Action Handlers (for TWS/headset buttons & OS widgets)
   useEffect(() => {
     if ('mediaSession' in navigator) {
@@ -641,6 +665,17 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
       navigator.mediaSession.setActionHandler('pause', () => togglePlayRef.current())
       navigator.mediaSession.setActionHandler('previoustrack', () => prevTrackRef.current())
       navigator.mediaSession.setActionHandler('nexttrack', () => nextTrackRef.current())
+      navigator.mediaSession.setActionHandler('seekto', (details) => {
+        if (details.seekTime !== undefined && details.seekTime !== null) {
+          seekRef.current(details.seekTime)
+        }
+      })
+      navigator.mediaSession.setActionHandler('seekbackward', (details) => {
+        seekOffsetRef.current(-(details.seekOffset || 10))
+      })
+      navigator.mediaSession.setActionHandler('seekforward', (details) => {
+        seekOffsetRef.current(details.seekOffset || 10)
+      })
     }
     return () => {
       if ('mediaSession' in navigator) {
@@ -648,6 +683,9 @@ export const AudioProvider = ({ children }: { children: React.ReactNode }) => {
         navigator.mediaSession.setActionHandler('pause', null)
         navigator.mediaSession.setActionHandler('previoustrack', null)
         navigator.mediaSession.setActionHandler('nexttrack', null)
+        navigator.mediaSession.setActionHandler('seekto', null)
+        navigator.mediaSession.setActionHandler('seekbackward', null)
+        navigator.mediaSession.setActionHandler('seekforward', null)
       }
     }
   }, [])
