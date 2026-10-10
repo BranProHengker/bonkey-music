@@ -365,9 +365,19 @@ function isJunkTrack(track: TrackMeta): boolean {
             if (Array.isArray(parsed)) {
               const clean = (parsed as TrackMeta[]).filter(t => !isJunkTrack(t))
               if (clean.length > 0) {
-                setTracks(clean)
+                let port = 0
+                if (window.api.getAudioPort) {
+                  try {
+                    port = await window.api.getAudioPort()
+                  } catch (_) {}
+                }
+                const cleanWithCovers = clean.map(t => ({
+                  ...t,
+                  coverArt: (port && port > 0) ? `http://127.0.0.1:${port}/cover?path=${encodeURIComponent(t.filePath)}` : t.coverArt
+                }))
+                setTracks(cleanWithCovers)
                 if (window.api.saveLibrary) {
-                  await window.api.saveLibrary(clean)
+                  await window.api.saveLibrary(cleanWithCovers)
                 }
                 setIsScanning(false)
                 return
@@ -448,9 +458,19 @@ function isJunkTrack(track: TrackMeta): boolean {
       if (lib && Array.isArray(lib) && lib.length > 0) {
         const clean = (lib as TrackMeta[]).filter(t => !isJunkTrack(t))
         if (clean.length > 0) {
-          setTracks(clean)
+          let port = 0
+          if (window.api.getAudioPort) {
+            try {
+              port = await window.api.getAudioPort()
+            } catch (_) {}
+          }
+          const cleanWithCovers = clean.map(t => ({
+            ...t,
+            coverArt: (port && port > 0) ? `http://127.0.0.1:${port}/cover?path=${encodeURIComponent(t.filePath)}` : t.coverArt
+          }))
+          setTracks(cleanWithCovers)
           if (clean.length !== lib.length && window.api.saveLibrary) {
-            await window.api.saveLibrary(clean)
+            await window.api.saveLibrary(cleanWithCovers)
           }
         } else {
           handleAutoScan()
@@ -1755,10 +1775,6 @@ function isJunkTrack(track: TrackMeta): boolean {
           activePlaylist={activePlaylist}
           activeAlbum={activeAlbum}
           onClearActiveFilters={handleClearFilters}
-          onSearchClick={() => {
-            searchInputRef.current?.focus()
-            searchInputRef.current?.select()
-          }}
         />
       )}
 

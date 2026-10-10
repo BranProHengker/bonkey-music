@@ -200,8 +200,22 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
         }
     }
 
+    let port = crate::services::audio_server::get_server_port();
+
     if scanned_tracks.is_empty() {
-        return Ok(read_library_from_disk());
+        let mut existing = read_library_from_disk();
+        if port > 0 {
+            for track in &mut existing {
+                if track.cover_art.is_none() {
+                    track.cover_art = Some(format!(
+                        "http://127.0.0.1:{}/cover?path={}",
+                        port,
+                        urlencoding::encode(&track.file_path)
+                    ));
+                }
+            }
+        }
+        return Ok(existing);
     }
 
     let mut existing = read_library_from_disk();
@@ -210,6 +224,18 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
             existing[pos] = track;
         } else {
             existing.push(track);
+        }
+    }
+
+    if port > 0 {
+        for track in &mut existing {
+            if track.cover_art.is_none() {
+                track.cover_art = Some(format!(
+                    "http://127.0.0.1:{}/cover?path={}",
+                    port,
+                    urlencoding::encode(&track.file_path)
+                ));
+            }
         }
     }
 
@@ -222,7 +248,19 @@ fn auto_scan_audio_sync() -> Result<Vec<TrackMeta>, String> {
 }
 
 #[tauri::command]
-pub fn save_library(tracks: Vec<TrackMeta>) -> Result<(), String> {
+pub fn save_library(mut tracks: Vec<TrackMeta>) -> Result<(), String> {
+    let port = crate::services::audio_server::get_server_port();
+    if port > 0 {
+        for track in &mut tracks {
+            if track.cover_art.is_none() {
+                track.cover_art = Some(format!(
+                    "http://127.0.0.1:{}/cover?path={}",
+                    port,
+                    urlencoding::encode(&track.file_path)
+                ));
+            }
+        }
+    }
     save_library_to_disk(&tracks)
 }
 
@@ -253,13 +291,7 @@ pub fn load_library() -> Result<Vec<TrackMeta>, String> {
         }
 
         // Always ensure cover_art uses dynamic server port
-        if is_base64
-            || track
-                .cover_art
-                .as_ref()
-                .map(|c| c.contains("/cover?path="))
-                .unwrap_or(false)
-        {
+        if port > 0 {
             track.cover_art = Some(format!(
                 "http://127.0.0.1:{}/cover?path={}",
                 port,

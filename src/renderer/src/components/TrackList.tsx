@@ -144,10 +144,30 @@ const TrackRow = memo(function TrackRow({
         {viewMode === 'detailed' ? (
           <div className="detailed-art-box">
             {track.coverArt ? (
-              <img src={track.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
-            ) : (
+              <img
+                src={track.coverArt}
+                alt="Cover Art"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement
+                  if (fb) fb.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <div
+              className="track-art-fallback"
+              style={{
+                display: track.coverArt ? 'none' : 'flex',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <MusicNotes size={20} weight="light" />
-            )}
+            </div>
             {isCurrent && isPlaying && (
               <div className="track-equalizer-overlay">
                 <span className="equalizer-bar bar-1" />
@@ -159,10 +179,30 @@ const TrackRow = memo(function TrackRow({
         ) : (
           <div className="track-thumbnail">
             {track.coverArt ? (
-              <img src={track.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
-            ) : (
+              <img
+                src={track.coverArt}
+                alt="Cover Art"
+                loading="lazy"
+                decoding="async"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement
+                  if (fb) fb.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <div
+              className="track-art-fallback"
+              style={{
+                display: track.coverArt ? 'none' : 'flex',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <MusicNotes size={16} weight="light" />
-            )}
+            </div>
           </div>
         )}
         <div className="track-title-container">
@@ -258,12 +298,24 @@ const TrackGridCard = memo(function TrackGridCard({
     >
       <div className="grid-card-art">
         {track.coverArt ? (
-          <img src={track.coverArt} alt={track.title} loading="lazy" decoding="async" />
-        ) : (
-          <div className="grid-card-placeholder">
-            <MusicNotes size={42} weight="light" />
-          </div>
-        )}
+          <img
+            src={track.coverArt}
+            alt={track.title}
+            loading="lazy"
+            decoding="async"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none'
+              const fb = e.currentTarget.nextElementSibling as HTMLElement
+              if (fb) fb.style.display = 'flex'
+            }}
+          />
+        ) : null}
+        <div
+          className="grid-card-placeholder"
+          style={{ display: track.coverArt ? 'none' : 'flex' }}
+        >
+          <MusicNotes size={42} weight="light" />
+        </div>
 
         <button
           type="button"

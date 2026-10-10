@@ -25,8 +25,11 @@ if (fs.existsSync(manifestPath)) {
   if (!content.includes('android:requestLegacyExternalStorage="true"')) {
     content = content.replace('<application', '<application android:requestLegacyExternalStorage="true"')
   }
+  if (!content.includes('android:usesCleartextTraffic="true"')) {
+    content = content.replace('<application', '<application android:usesCleartextTraffic="true"')
+  }
   fs.writeFileSync(manifestPath, content, 'utf8')
-  console.log('[setup-android] Successfully injected permissions into AndroidManifest.xml')
+  console.log('[setup-android] Successfully injected permissions and cleartextTraffic into AndroidManifest.xml')
 } else {
   console.warn('[setup-android] AndroidManifest.xml not found at:', manifestPath)
 }

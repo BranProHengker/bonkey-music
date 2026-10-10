@@ -11,7 +11,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20Android-171717?style=flat-square&labelColor=0d0d0f" alt="Platforms" />
-  <img src="https://img.shields.io/badge/version-2.3.7-0A84FF?style=flat-square&labelColor=0d0d0f" alt="Version" />
+  <img src="https://img.shields.io/badge/version-2.3.8-0A84FF?style=flat-square&labelColor=0d0d0f" alt="Version" />
   <img src="https://img.shields.io/badge/license-MIT-8E8E93?style=flat-square&labelColor=0d0d0f" alt="License" />
   <img src="https://img.shields.io/badge/Tauri-v2-FFC131?style=flat-square&labelColor=0d0d0f&logo=tauri&logoColor=white" alt="Tauri" />
   <img src="https://img.shields.io/badge/Rust-2021-DEA584?style=flat-square&labelColor=0d0d0f&logo=rust&logoColor=white" alt="Rust" />

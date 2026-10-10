@@ -37,7 +37,6 @@ interface PlayerBarProps {
   activePlaylist?: string | null
   activeAlbum?: string | null
   onClearActiveFilters?: () => void
-  onSearchClick?: () => void
 }
 
 function PlayerBar({
@@ -57,8 +56,7 @@ function PlayerBar({
   setCurrentView,
   activePlaylist,
   activeAlbum,
-  onClearActiveFilters,
-  onSearchClick
+  onClearActiveFilters
 }: PlayerBarProps) {
   const {
     currentTrack,
@@ -239,10 +237,30 @@ function PlayerBar({
       >
         <div className="player-art">
           {currentTrack?.coverArt ? (
-            <img src={currentTrack.coverArt} alt="Cover Art" loading="lazy" decoding="async" />
-          ) : (
+            <img
+              src={currentTrack.coverArt}
+              alt="Cover Art"
+              loading="lazy"
+              decoding="async"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+                const fb = e.currentTarget.nextElementSibling as HTMLElement
+                if (fb) fb.style.display = 'flex'
+              }}
+            />
+          ) : null}
+          <div
+            className="player-art-fallback"
+            style={{
+              display: currentTrack?.coverArt ? 'none' : 'flex',
+              width: '100%',
+              height: '100%',
+              alignItems: 'center',
+              justifyContent: 'center'
+            }}
+          >
             <MusicNotes size={22} weight="light" />
-          )}
+          </div>
         </div>
         <div className="player-details">
           <div className="player-title-row">
@@ -476,7 +494,6 @@ function PlayerBar({
         onOpenNowPlaying={onOpenNowPlaying || (() => {})}
         currentView={currentView || 'home'}
         setCurrentView={setCurrentView || (() => {})}
-        onSearchClick={onSearchClick || (() => {})}
         activePlaylist={activePlaylist}
         activeAlbum={activeAlbum}
         onClearActiveFilters={onClearActiveFilters}

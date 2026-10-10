@@ -54,7 +54,8 @@ pub fn read_track_metadata(path: &Path) -> Result<TrackMeta, String> {
     let genre = tag.and_then(|t| t.genre().map(|s| s.to_string()));
 
     let port = crate::services::audio_server::get_server_port();
-    let has_embedded_pic = tag.map(|t| !t.pictures().is_empty()).unwrap_or(false);
+    let has_embedded_pic = tagged_file.tags().iter().any(|t| !t.pictures().is_empty())
+        || tag.map(|t| !t.pictures().is_empty()).unwrap_or(false);
     let has_folder_pic = path
         .parent()
         .map(|p| {
@@ -151,6 +152,15 @@ pub fn embed_metadata(
 
 pub fn extract_cover_bytes(path: &Path) -> Option<(Vec<u8>, &'static str)> {
     if let Ok(tagged_file) = Probe::open(path).and_then(|p| p.read()) {
+        for t in tagged_file.tags() {
+            if let Some(pic) = t.pictures().first() {
+                let mime = match pic.mime_type() {
+                    Some(MimeType::Png) => "image/png",
+                    _ => "image/jpeg",
+                };
+                return Some((pic.data().to_vec(), mime));
+            }
+        }
         let tag = tagged_file
             .primary_tag()
             .or_else(|| tagged_file.first_tag());

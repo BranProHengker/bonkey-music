@@ -5356,28 +5356,101 @@ button {
     font-size: 11px;
   }
 
-  /* Minimal track grid at 600px */
+  /* Clean mobile single-line track item */
   .track-list-header {
-    display: none;
+    display: none !important;
   }
 
   .track-row {
-    grid-template-columns: 1fr auto auto;
-    padding: 6px 10px;
-    gap: 8px;
-    cursor: pointer;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    min-height: 52px !important;
+    padding: 7px 10px !important;
+    gap: 10px !important;
+    cursor: pointer !important;
+    border-radius: 10px !important;
   }
 
-  .track-row .btn-track-add-queue {
-    display: none;
+  .track-number,
+  .track-artist-col,
+  .track-album,
+  .track-genre,
+  .btn-track-add-queue {
+    display: none !important;
   }
 
-  .track-number {
-    display: none;
+  .track-info-col {
+    display: flex !important;
+    align-items: center !important;
+    gap: 12px !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+  }
+
+  .track-thumbnail,
+  .detailed-art-box {
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px !important;
+    border-radius: 8px !important;
+    flex-shrink: 0 !important;
+    overflow: hidden !important;
+  }
+
+  .track-title-container,
+  .track-details {
+    display: flex !important;
+    flex-direction: column !important;
+    min-width: 0 !important;
+    flex: 1 !important;
+    gap: 2px !important;
+  }
+
+  .track-title {
+    font-size: 13.5px !important;
+    font-weight: 600 !important;
+    line-height: 1.25 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: var(--text-primary) !important;
+  }
+
+  .track-artist-sub {
+    display: block !important;
+    font-size: 11.5px !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    color: var(--text-secondary) !important;
   }
 
   .track-duration {
-    font-size: 11px;
+    font-size: 11.5px !important;
+    color: var(--text-tertiary) !important;
+    font-variant-numeric: tabular-nums !important;
+    flex-shrink: 0 !important;
+    margin-right: 2px !important;
+  }
+
+  .track-actions-col {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-shrink: 0 !important;
+    justify-self: auto !important;
+  }
+
+  .btn-track-favorite,
+  .btn-track-options {
+    width: 32px !important;
+    height: 32px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
   }
 
   .queue-panel {
@@ -7030,29 +7103,37 @@ body.theme-lunio .player-bar .btn-control.active {
     pointer-events: none !important; /* Allow clicks through gaps */
   }
 
-  /* 1. Upper Capsule: Mini-Player (Song info on left, Play/Pause + Next on right) */
+  /* 1. Upper Capsule: Mini-Player (Pure Liquid Glass matching Desktop) */
   .mobile-mini-player {
     pointer-events: auto !important;
     width: 100% !important;
-    max-width: 480px !important;
+    max-width: 440px !important;
     height: 52px !important;
     background: linear-gradient(
       135deg,
       rgba(255, 255, 255, 0.12) 0%,
-      rgba(255, 255, 255, 0.04) 100%
-    ), rgba(24, 24, 26, 0.92) !important;
-    backdrop-filter: blur(28px) saturate(190%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+      rgba(255, 255, 255, 0.03) 100%
+    ), rgba(22, 22, 26, 0.52) !important;
+    backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
     border-radius: 9999px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    padding: 6px 16px 6px 8px !important;
+    padding: 6px 14px 6px 8px !important;
     cursor: pointer !important;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), background 0.2s !important;
     box-sizing: border-box !important;
+  }
+
+  .mobile-mini-player:hover {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 255, 255, 0.16) 0%,
+      rgba(255, 255, 255, 0.05) 100%
+    ), rgba(22, 22, 26, 0.60) !important;
   }
 
   .mobile-mini-player:active {
@@ -7143,40 +7224,40 @@ body.theme-lunio .player-bar .btn-control.active {
     transform: scale(0.92) !important;
   }
 
-  /* 2. Lower Capsule: Navigation Bar (Play, Explore, Library, Search) matching Photo 4 */
+  /* 2. Lower Capsule: Navigation Bar (Pure Liquid Glass matching Desktop) */
   .mobile-bottom-nav {
     pointer-events: auto !important;
     width: 100% !important;
-    max-width: 480px !important;
-    height: 48px !important;
+    max-width: 440px !important;
+    height: 50px !important;
     background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.08) 0%,
-      rgba(255, 255, 255, 0.02) 100%
-    ), rgba(18, 18, 20, 0.94) !important;
-    backdrop-filter: blur(28px) saturate(190%) !important;
-    -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+      135deg,
+      rgba(255, 255, 255, 0.12) 0%,
+      rgba(255, 255, 255, 0.03) 100%
+    ), rgba(22, 22, 26, 0.52) !important;
+    backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
+    -webkit-backdrop-filter: blur(28px) saturate(190%) contrast(102%) !important;
     border-radius: 9999px !important;
-    border: 1px solid rgba(255, 255, 255, 0.08) !important;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6) !important;
+    border: 1px solid rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.18) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: space-around !important;
-    padding: 4px 6px !important;
+    padding: 4px 8px !important;
     box-sizing: border-box !important;
   }
 
   .mobile-nav-tab {
     background: transparent !important;
     border: none !important;
-    color: rgba(255, 255, 255, 0.55) !important;
-    font-size: 11.5px !important;
+    color: rgba(255, 255, 255, 0.6) !important;
+    font-size: 12px !important;
     font-weight: 600 !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 6px !important;
-    padding: 7px 14px !important;
+    gap: 7px !important;
+    padding: 8px 20px !important;
     border-radius: 9999px !important;
     cursor: pointer !important;
     transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
@@ -7187,10 +7268,10 @@ body.theme-lunio .player-bar .btn-control.active {
   }
 
   .mobile-nav-tab.active {
-    background: rgba(255, 255, 255, 0.16) !important;
+    background: rgba(255, 255, 255, 0.18) !important;
     color: #ffffff !important;
     font-weight: 700 !important;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25) !important;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.22) !important;
   }
 
   /* Album banner responsive adjustments */
@@ -7216,29 +7297,6 @@ body.theme-lunio .player-bar .btn-control.active {
   .album-banner-meta,
   .album-actions-row {
     justify-content: center !important;
-  }
-}
-
-/* ─── Mobile GPU & Battery Saver Optimization ────────────────────────── */
-@media (max-width: 768px), (pointer: coarse) {
-  * {
-    /* Disable expensive real-time offscreen Gaussian blurs on mobile GPU */
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-  }
-
-  /* Clean tinted surfaces with high opacity to avoid GPU blending overhead */
-  .now-playing-panel,
-  .now-playing-overlay,
-  .player-bar-container,
-  .sidebar-container,
-  .floating-dock,
-  .modal-backdrop,
-  .glass-card,
-  .studio-hub-container,
-  .mobile-bottom-dock,
-  .queue-panel-container {
-    background-color: rgba(18, 18, 22, 0.98) !important;
   }
 }
 

@@ -5,7 +5,6 @@ import {
   SkipForward,
   Compass,
   Books,
-  MagnifyingGlass,
   MusicNotes,
   House
 } from '@phosphor-icons/react'
@@ -19,7 +18,6 @@ interface MobileBottomDockProps {
   onOpenNowPlaying: () => void
   currentView: 'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio'
   setCurrentView: (view: 'home' | 'library' | 'favorites' | 'settings' | 'latest' | 'studio') => void
-  onSearchClick: () => void
   activePlaylist?: string | null
   activeAlbum?: string | null
   onClearActiveFilters?: () => void
@@ -33,7 +31,6 @@ function MobileBottomDock({
   onOpenNowPlaying,
   currentView,
   setCurrentView,
-  onSearchClick,
   activePlaylist,
   activeAlbum,
   onClearActiveFilters
@@ -60,10 +57,28 @@ function MobileBottomDock({
         <div className="mobile-mini-player-left">
           <div className="mobile-mini-player-thumb">
             {currentTrack?.coverArt ? (
-              <img src={currentTrack.coverArt} alt={currentTrack.title} />
-            ) : (
+              <img
+                src={currentTrack.coverArt}
+                alt={currentTrack.title}
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none'
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement
+                  if (fb) fb.style.display = 'flex'
+                }}
+              />
+            ) : null}
+            <div
+              className="mini-fallback-icon"
+              style={{
+                display: currentTrack?.coverArt ? 'none' : 'flex',
+                width: '100%',
+                height: '100%',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
               <MusicNotes size={18} weight="light" />
-            )}
+            </div>
           </div>
           <div className="mobile-mini-player-info">
             <span className="mobile-mini-title">
@@ -135,16 +150,6 @@ function MobileBottomDock({
         >
           <Books size={17} weight={isLibraryActive ? 'fill' : 'bold'} />
           <span>Library</span>
-        </button>
-
-        <button
-          type="button"
-          className="mobile-nav-tab"
-          onClick={onSearchClick}
-          title="Search"
-        >
-          <MagnifyingGlass size={17} weight="bold" />
-          <span>Search</span>
         </button>
       </nav>
     </div>
